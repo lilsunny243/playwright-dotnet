@@ -94,26 +94,38 @@ public partial interface IFrameLocator
     ILocator GetByAltText(Regex text, FrameLocatorGetByAltTextOptions? options = default);
 
     /// <summary>
-    /// <para>Allows locating input elements by the text of the associated label.</para>
+    /// <para>
+    /// Allows locating input elements by the text of the associated <c>&lt;label&gt;</c>
+    /// or <c>aria-labelledby</c> element, or by the <c>aria-label</c> attribute.
+    /// </para>
     /// <para>**Usage**</para>
     /// <para>
-    /// For example, this method will find the input by label text "Password" in the following
-    /// DOM:
+    /// For example, this method will find inputs by label "Username" and "Password" in
+    /// the following DOM:
     /// </para>
-    /// <code>await page.GetByLabel("Password").FillAsync("secret");</code>
+    /// <code>
+    /// await page.GetByLabel("Username").FillAsync("john");<br/>
+    /// await page.GetByLabel("Password").FillAsync("secret");
+    /// </code>
     /// </summary>
     /// <param name="text">Text to locate the element for.</param>
     /// <param name="options">Call options</param>
     ILocator GetByLabel(string text, FrameLocatorGetByLabelOptions? options = default);
 
     /// <summary>
-    /// <para>Allows locating input elements by the text of the associated label.</para>
+    /// <para>
+    /// Allows locating input elements by the text of the associated <c>&lt;label&gt;</c>
+    /// or <c>aria-labelledby</c> element, or by the <c>aria-label</c> attribute.
+    /// </para>
     /// <para>**Usage**</para>
     /// <para>
-    /// For example, this method will find the input by label text "Password" in the following
-    /// DOM:
+    /// For example, this method will find inputs by label "Username" and "Password" in
+    /// the following DOM:
     /// </para>
-    /// <code>await page.GetByLabel("Password").FillAsync("secret");</code>
+    /// <code>
+    /// await page.GetByLabel("Username").FillAsync("john");<br/>
+    /// await page.GetByLabel("Password").FillAsync("secret");
+    /// </code>
     /// </summary>
     /// <param name="text">Text to locate the element for.</param>
     /// <param name="options">Call options</param>
@@ -231,19 +243,19 @@ public partial interface IFrameLocator
     /// <para>You can locate by text substring, exact string, or a regular expression:</para>
     /// <code>
     /// // Matches &lt;span&gt;<br/>
-    /// page.GetByText("world")<br/>
+    /// page.GetByText("world");<br/>
     /// <br/>
     /// // Matches first &lt;div&gt;<br/>
-    /// page.GetByText("Hello world")<br/>
+    /// page.GetByText("Hello world");<br/>
     /// <br/>
     /// // Matches second &lt;div&gt;<br/>
-    /// page.GetByText("Hello", new() { Exact: true })<br/>
+    /// page.GetByText("Hello", new() { Exact = true });<br/>
     /// <br/>
     /// // Matches both &lt;div&gt;s<br/>
-    /// page.GetByText(new Regex("Hello"))<br/>
+    /// page.GetByText(new Regex("Hello"));<br/>
     /// <br/>
     /// // Matches second &lt;div&gt;<br/>
-    /// page.GetByText(new Regex("^hello$", RegexOptions.IgnoreCase))
+    /// page.GetByText(new Regex("^hello$", RegexOptions.IgnoreCase));
     /// </code>
     /// <para>**Details**</para>
     /// <para>
@@ -272,19 +284,19 @@ public partial interface IFrameLocator
     /// <para>You can locate by text substring, exact string, or a regular expression:</para>
     /// <code>
     /// // Matches &lt;span&gt;<br/>
-    /// page.GetByText("world")<br/>
+    /// page.GetByText("world");<br/>
     /// <br/>
     /// // Matches first &lt;div&gt;<br/>
-    /// page.GetByText("Hello world")<br/>
+    /// page.GetByText("Hello world");<br/>
     /// <br/>
     /// // Matches second &lt;div&gt;<br/>
-    /// page.GetByText("Hello", new() { Exact: true })<br/>
+    /// page.GetByText("Hello", new() { Exact = true });<br/>
     /// <br/>
     /// // Matches both &lt;div&gt;s<br/>
-    /// page.GetByText(new Regex("Hello"))<br/>
+    /// page.GetByText(new Regex("Hello"));<br/>
     /// <br/>
     /// // Matches second &lt;div&gt;<br/>
-    /// page.GetByText(new Regex("^hello$", RegexOptions.IgnoreCase))
+    /// page.GetByText(new Regex("^hello$", RegexOptions.IgnoreCase));
     /// </code>
     /// <para>**Details**</para>
     /// <para>
@@ -334,9 +346,20 @@ public partial interface IFrameLocator
     /// </para>
     /// <para><a href="https://playwright.dev/dotnet/docs/locators">Learn more about locators</a>.</para>
     /// </summary>
-    /// <param name="selector">A selector to use when resolving DOM element.</param>
+    /// <param name="selectorOrLocator">A selector or locator to use when resolving DOM element.</param>
     /// <param name="options">Call options</param>
-    ILocator Locator(string selector, FrameLocatorLocatorOptions? options = default);
+    ILocator Locator(string selectorOrLocator, FrameLocatorLocatorOptions? options = default);
+
+    /// <summary>
+    /// <para>
+    /// The method finds an element matching the specified selector in the locator's subtree.
+    /// It also accepts filter options, similar to <see cref="ILocator.Filter"/> method.
+    /// </para>
+    /// <para><a href="https://playwright.dev/dotnet/docs/locators">Learn more about locators</a>.</para>
+    /// </summary>
+    /// <param name="selectorOrLocator">A selector or locator to use when resolving DOM element.</param>
+    /// <param name="options">Call options</param>
+    ILocator Locator(ILocator selectorOrLocator, FrameLocatorLocatorOptions? options = default);
 
     /// <summary>
     /// <para>

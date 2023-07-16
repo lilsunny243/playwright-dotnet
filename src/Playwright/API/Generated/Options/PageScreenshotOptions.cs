@@ -45,6 +45,7 @@ public class PageScreenshotOptions
         Clip = clone.Clip;
         FullPage = clone.FullPage;
         Mask = clone.Mask;
+        MaskColor = clone.MaskColor;
         OmitBackground = clone.OmitBackground;
         Path = clone.Path;
         Quality = clone.Quality;
@@ -82,12 +83,7 @@ public class PageScreenshotOptions
     [JsonPropertyName("caret")]
     public ScreenshotCaret? Caret { get; set; }
 
-    /// <summary>
-    /// <para>
-    /// An object which specifies clipping of the resulting image. Should have the following
-    /// fields:
-    /// </para>
-    /// </summary>
+    /// <summary><para>An object which specifies clipping of the resulting image.</para></summary>
     [JsonPropertyName("clip")]
     public Clip? Clip { get; set; }
 
@@ -103,12 +99,21 @@ public class PageScreenshotOptions
     /// <summary>
     /// <para>
     /// Specify locators that should be masked when the screenshot is taken. Masked elements
-    /// will be overlaid with a pink box <c>#FF00FF</c> that completely covers its bounding
-    /// box.
+    /// will be overlaid with a pink box <c>#FF00FF</c> (customized by <paramref name="maskColor"/>)
+    /// that completely covers its bounding box.
     /// </para>
     /// </summary>
     [JsonPropertyName("mask")]
     public IEnumerable<ILocator>? Mask { get; set; }
+
+    /// <summary>
+    /// <para>
+    /// Specify the color of the overlay box for masked elements, in <a href="https://developer.mozilla.org/en-US/docs/Web/CSS/color_value">CSS
+    /// color format</a>. Default color is pink <c>#FF00FF</c>.
+    /// </para>
+    /// </summary>
+    [JsonPropertyName("maskColor")]
+    public string? MaskColor { get; set; }
 
     /// <summary>
     /// <para>
@@ -148,8 +153,8 @@ public class PageScreenshotOptions
 
     /// <summary>
     /// <para>
-    /// Maximum time in milliseconds, defaults to 30 seconds, pass <c>0</c> to disable timeout.
-    /// The default value can be changed by using the <see cref="IBrowserContext.SetDefaultTimeout"/>
+    /// Maximum time in milliseconds. Defaults to <c>30000</c> (30 seconds). Pass <c>0</c>
+    /// to disable timeout. The default value can be changed by using the <see cref="IBrowserContext.SetDefaultTimeout"/>
     /// or <see cref="IPage.SetDefaultTimeout"/> methods.
     /// </para>
     /// </summary>

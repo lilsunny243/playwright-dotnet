@@ -39,8 +39,18 @@ public class TracingStartChunkOptions
             return;
         }
 
+        Name = clone.Name;
         Title = clone.Title;
     }
+
+    /// <summary>
+    /// <para>
+    /// If specified, the trace is going to be saved into the file with the given name inside
+    /// the <paramref name="tracesDir"/> folder specified in <see cref="IBrowserType.LaunchAsync"/>.
+    /// </para>
+    /// </summary>
+    [JsonPropertyName("name")]
+    public string? Name { get; set; }
 
     /// <summary><para>Trace name to be shown in the Trace Viewer.</para></summary>
     [JsonPropertyName("title")]

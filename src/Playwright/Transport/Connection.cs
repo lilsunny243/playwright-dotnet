@@ -29,6 +29,7 @@ using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
+using System.Runtime.CompilerServices;
 using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
@@ -45,6 +46,7 @@ internal class Connection : IDisposable
     private readonly ConcurrentDictionary<int, ConnectionCallback> _callbacks = new();
     private readonly Root _rootObject;
     private readonly TaskQueue _queue = new();
+    private int _tracingCount;
     private int _lastId;
     private string _closedErrorMessage = string.Empty;
 
@@ -53,14 +55,20 @@ internal class Connection : IDisposable
         _rootObject = new(null, this, string.Empty);
         LocalUtils = localUtils;
 
-        DefaultJsonSerializerOptions = JsonExtensions.GetNewDefaultSerializerOptions();
-        DefaultJsonSerializerOptions.Converters.Add(new ChannelToGuidConverter(this));
-        DefaultJsonSerializerOptions.Converters.Add(new ChannelOwnerToGuidConverter<JSHandle>(this));
-        DefaultJsonSerializerOptions.Converters.Add(new ChannelOwnerToGuidConverter<ElementHandle>(this));
-        DefaultJsonSerializerOptions.Converters.Add(new ChannelOwnerToGuidConverter<IChannelOwner>(this));
+        JsonSerializerOptions NewJsonSerializerOptions(bool keepNulls)
+        {
+            var options = JsonExtensions.GetNewDefaultSerializerOptions(keepNulls);
+            options.Converters.Add(new ChannelToGuidConverter(this));
+            options.Converters.Add(new ChannelOwnerToGuidConverter<JSHandle>(this));
+            options.Converters.Add(new ChannelOwnerToGuidConverter<ElementHandle>(this));
+            options.Converters.Add(new ChannelOwnerToGuidConverter<IChannelOwner>(this));
 
-        // Workaround for https://github.com/dotnet/runtime/issues/46522
-        DefaultJsonSerializerOptions.Converters.Add(new ChannelOwnerListToGuidListConverter<WritableStream>(this));
+            // Workaround for https://github.com/dotnet/runtime/issues/46522
+            options.Converters.Add(new ChannelOwnerListToGuidListConverter<WritableStream>(this));
+            return options;
+        }
+        DefaultJsonSerializerOptions = NewJsonSerializerOptions(false);
+        DefaultJsonSerializerOptionsKeepNulls = NewJsonSerializerOptions(true);
     }
 
     /// <inheritdoc cref="IDisposable.Dispose"/>
@@ -76,9 +84,11 @@ internal class Connection : IDisposable
 
     internal LocalUtils LocalUtils { get; private set; }
 
-    internal Func<object, Task> OnMessage { get; set; }
+    internal Func<object, bool, Task> OnMessage { get; set; }
 
     internal JsonSerializerOptions DefaultJsonSerializerOptions { get; }
+
+    internal JsonSerializerOptions DefaultJsonSerializerOptionsKeepNulls { get; }
 
     public void Dispose()
     {
@@ -86,21 +96,36 @@ internal class Connection : IDisposable
         GC.SuppressFinalize(this);
     }
 
+    internal void SetIsTracing(bool isTracing)
+    {
+        if (isTracing)
+        {
+            _tracingCount++;
+        }
+        else
+        {
+            _tracingCount--;
+        }
+    }
+
     internal Task<JsonElement?> SendMessageToServerAsync(
         string guid,
         string method,
-        Dictionary<string, object> args = null)
-        => SendMessageToServerAsync<JsonElement?>(guid, method, args);
+        Dictionary<string, object> args = null,
+        bool keepNulls = false)
+        => SendMessageToServerAsync<JsonElement?>(guid, method, args, keepNulls);
 
     internal Task<T> SendMessageToServerAsync<T>(
         string guid,
         string method,
-        Dictionary<string, object> args = null) => WrapApiCallAsync(() => InnerSendMessageToServerAsync<T>(guid, method, args));
+        Dictionary<string, object> args = null,
+        bool keepNulls = false) => WrapApiCallAsync(() => InnerSendMessageToServerAsync<T>(guid, method, args, keepNulls));
 
     private async Task<T> InnerSendMessageToServerAsync<T>(
         string guid,
         string method,
-        Dictionary<string, object> dictionary = null)
+        Dictionary<string, object> dictionary = null,
+        bool keepNulls = false)
     {
         if (!string.IsNullOrEmpty(_closedErrorMessage))
         {
@@ -123,6 +148,25 @@ internal class Connection : IDisposable
                 .Where(f => f.Value != null)
                 .ToDictionary(f => f.Key, f => f.Value);
         }
+        var (apiName, frames) = (ApiZone.Value[0].ApiName, ApiZone.Value[0].Frames);
+        var metadata = new Dictionary<string, object>
+        {
+            ["internal"] = string.IsNullOrEmpty(apiName),
+            ["wallTime"] = DateTimeOffset.Now.ToUnixTimeMilliseconds(),
+        };
+        if (!string.IsNullOrEmpty(apiName))
+        {
+            metadata["apiName"] = apiName;
+        }
+        if (frames.Count > 0)
+        {
+            metadata["location"] = new Dictionary<string, object>
+            {
+                ["file"] = frames[0].File,
+                ["line"] = frames[0].Line,
+                ["column"] = frames[0].Column,
+            };
+        }
 
         await _queue.EnqueueAsync(() =>
         {
@@ -132,13 +176,18 @@ internal class Connection : IDisposable
                 Guid = guid,
                 Method = method,
                 Params = sanitizedArgs,
-                Metadata = ApiZone.Value[0],
+                Metadata = metadata,
             };
 
             TraceMessage("pw:channel:command", message);
 
-            return OnMessage(message);
+            return OnMessage(message, keepNulls);
         }).ConfigureAwait(false);
+
+        if (_tracingCount > 0 && frames.Count > 0 && guid != "localUtils")
+        {
+            LocalUtils.AddStackToTracingNoReply(frames, id);
+        }
 
         var result = await tcs.Task.ConfigureAwait(false);
 
@@ -414,6 +463,7 @@ internal class Connection : IDisposable
         }
     }
 
+    [MethodImpl(MethodImplOptions.NoInlining)]
     internal async Task<T> WrapApiCallAsync<T>(Func<Task<T>> action, bool isInternal = false)
     {
         EnsureApiZoneExists();
@@ -460,7 +510,7 @@ internal class Connection : IDisposable
         {
             if (!string.IsNullOrEmpty(apiName))
             {
-                ApiZone.Value[0] = new() { ApiName = isInternal ? null : apiName, Stack = stack, Internal = isInternal };
+                ApiZone.Value[0] = new() { ApiName = isInternal ? null : apiName, Frames = stack };
             }
             return await action().ConfigureAwait(false);
         }
@@ -488,6 +538,7 @@ internal class Connection : IDisposable
             namespaceName.StartsWith("Microsoft.Playwright.Helpers", StringComparison.InvariantCultureIgnoreCase));
     }
 
+    [MethodImpl(MethodImplOptions.NoInlining)] // This method is also a stacktrace marker.
     internal async Task WrapApiBoundaryAsync(Func<Task> action)
     {
         EnsureApiZoneExists();

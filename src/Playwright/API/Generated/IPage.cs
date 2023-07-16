@@ -51,7 +51,7 @@ namespace Microsoft.Playwright;
 ///         await using var browser = await playwright.Webkit.LaunchAsync();<br/>
 ///         var page = await browser.NewPageAsync();<br/>
 ///         await page.GotoAsync("https://www.theverge.com");<br/>
-///         await page.ScreenshotAsync(new PageScreenshotOptions { Path = "theverge.png" });<br/>
+///         await page.ScreenshotAsync(new() { Path = "theverge.png" });<br/>
 ///     }<br/>
 /// }
 /// </code>
@@ -83,8 +83,11 @@ public partial interface IPage
     /// Emitted when JavaScript within the page calls one of console API methods, e.g. <c>console.log</c>
     /// or <c>console.dir</c>. Also emitted if the page throws an error or a warning.
     /// </para>
-    /// <para>The arguments passed into <c>console.log</c> appear as arguments on the event handler.</para>
-    /// <para>An example of handling <c>console</c> event:</para>
+    /// <para>
+    /// The arguments passed into <c>console.log</c> are available on the <see cref="IConsoleMessage"/>
+    /// event handler argument.
+    /// </para>
+    /// <para>**Usage**</para>
     /// <code>
     /// page.Console += async (_, msg) =&gt;<br/>
     /// {<br/>
@@ -123,6 +126,7 @@ public partial interface IPage
     /// or <see cref="IDialog.DismissAsync"/> the dialog - otherwise the page will <a href="https://developer.mozilla.org/en-US/docs/Web/JavaScript/EventLoop#never_blocking">freeze</a>
     /// waiting for the dialog, and actions like click will never finish.
     /// </para>
+    /// <para>**Usage**</para>
     /// <code>
     /// page.RequestFailed += (_, request) =&gt;<br/>
     /// {<br/>
@@ -132,8 +136,8 @@ public partial interface IPage
     /// </summary>
     /// <remarks>
     /// <para>
-    /// When no <see cref="IPage.Dialog"/> listeners are present, all dialogs are automatically
-    /// dismissed.
+    /// When no <see cref="IPage.Dialog"/> or <see cref="IBrowserContext.Dialog"/> listeners
+    /// are present, all dialogs are automatically dismissed.
     /// </para>
     /// </remarks>
     event EventHandler<IDialog> Dialog;
@@ -302,7 +306,7 @@ public partial interface IPage
     /// </para>
     /// <para>**Usage**</para>
     /// <para>An example of overriding <c>Math.random</c> before the page loads:</para>
-    /// <code>await page.AddInitScriptAsync("./preload.js");</code>
+    /// <code>await page.AddInitScriptAsync(scriptPath: "./preload.js");</code>
     /// </summary>
     /// <remarks>
     /// <para>
@@ -586,20 +590,20 @@ public partial interface IPage
     /// await page.EvaluateAsync("() =&gt; matchMedia('print').matches");<br/>
     /// // → false<br/>
     /// <br/>
-    /// await page.EmulateMediaAsync(new PageEmulateMediaOptions { Media = Media.Print });<br/>
+    /// await page.EmulateMediaAsync(new() { Media = Media.Print });<br/>
     /// await page.EvaluateAsync("() =&gt; matchMedia('screen').matches");<br/>
     /// // → false<br/>
     /// await page.EvaluateAsync("() =&gt; matchMedia('print').matches");<br/>
     /// // → true<br/>
     /// <br/>
-    /// await page.EmulateMediaAsync(new PageEmulateMediaOptions { Media = Media.Screen });<br/>
+    /// await page.EmulateMediaAsync(new() { Media = Media.Screen });<br/>
     /// await page.EvaluateAsync("() =&gt; matchMedia('screen').matches");<br/>
     /// // → true<br/>
     /// await page.EvaluateAsync("() =&gt; matchMedia('print').matches");<br/>
     /// // → false
     /// </code>
     /// <code>
-    /// await page.EmulateMediaAsync(new PageEmulateMediaOptions { ColorScheme = ColorScheme.Dark });<br/>
+    /// await page.EmulateMediaAsync(new() { ColorScheme = ColorScheme.Dark });<br/>
     /// await page.EvaluateAsync("matchMedia('(prefers-color-scheme: dark)').matches");<br/>
     /// // → true<br/>
     /// await page.EvaluateAsync("matchMedia('(prefers-color-scheme: light)').matches");<br/>
@@ -765,7 +769,7 @@ public partial interface IPage
     ///         using var playwright = await Playwright.CreateAsync();<br/>
     ///         await using var browser = await playwright.Webkit.LaunchAsync(new()<br/>
     ///         {<br/>
-    ///             Headless: false<br/>
+    ///             Headless = false,<br/>
     ///         });<br/>
     ///         var page = await browser.NewPageAsync();<br/>
     /// <br/>
@@ -830,7 +834,7 @@ public partial interface IPage
     ///         using var playwright = await Playwright.CreateAsync();<br/>
     ///         await using var browser = await playwright.Webkit.LaunchAsync(new()<br/>
     ///         {<br/>
-    ///             Headless: false<br/>
+    ///             Headless = false<br/>
     ///         });<br/>
     ///         var page = await browser.NewPageAsync();<br/>
     /// <br/>
@@ -994,26 +998,38 @@ public partial interface IPage
     ILocator GetByAltText(Regex text, PageGetByAltTextOptions? options = default);
 
     /// <summary>
-    /// <para>Allows locating input elements by the text of the associated label.</para>
+    /// <para>
+    /// Allows locating input elements by the text of the associated <c>&lt;label&gt;</c>
+    /// or <c>aria-labelledby</c> element, or by the <c>aria-label</c> attribute.
+    /// </para>
     /// <para>**Usage**</para>
     /// <para>
-    /// For example, this method will find the input by label text "Password" in the following
-    /// DOM:
+    /// For example, this method will find inputs by label "Username" and "Password" in
+    /// the following DOM:
     /// </para>
-    /// <code>await page.GetByLabel("Password").FillAsync("secret");</code>
+    /// <code>
+    /// await page.GetByLabel("Username").FillAsync("john");<br/>
+    /// await page.GetByLabel("Password").FillAsync("secret");
+    /// </code>
     /// </summary>
     /// <param name="text">Text to locate the element for.</param>
     /// <param name="options">Call options</param>
     ILocator GetByLabel(string text, PageGetByLabelOptions? options = default);
 
     /// <summary>
-    /// <para>Allows locating input elements by the text of the associated label.</para>
+    /// <para>
+    /// Allows locating input elements by the text of the associated <c>&lt;label&gt;</c>
+    /// or <c>aria-labelledby</c> element, or by the <c>aria-label</c> attribute.
+    /// </para>
     /// <para>**Usage**</para>
     /// <para>
-    /// For example, this method will find the input by label text "Password" in the following
-    /// DOM:
+    /// For example, this method will find inputs by label "Username" and "Password" in
+    /// the following DOM:
     /// </para>
-    /// <code>await page.GetByLabel("Password").FillAsync("secret");</code>
+    /// <code>
+    /// await page.GetByLabel("Username").FillAsync("john");<br/>
+    /// await page.GetByLabel("Password").FillAsync("secret");
+    /// </code>
     /// </summary>
     /// <param name="text">Text to locate the element for.</param>
     /// <param name="options">Call options</param>
@@ -1131,19 +1147,19 @@ public partial interface IPage
     /// <para>You can locate by text substring, exact string, or a regular expression:</para>
     /// <code>
     /// // Matches &lt;span&gt;<br/>
-    /// page.GetByText("world")<br/>
+    /// page.GetByText("world");<br/>
     /// <br/>
     /// // Matches first &lt;div&gt;<br/>
-    /// page.GetByText("Hello world")<br/>
+    /// page.GetByText("Hello world");<br/>
     /// <br/>
     /// // Matches second &lt;div&gt;<br/>
-    /// page.GetByText("Hello", new() { Exact: true })<br/>
+    /// page.GetByText("Hello", new() { Exact = true });<br/>
     /// <br/>
     /// // Matches both &lt;div&gt;s<br/>
-    /// page.GetByText(new Regex("Hello"))<br/>
+    /// page.GetByText(new Regex("Hello"));<br/>
     /// <br/>
     /// // Matches second &lt;div&gt;<br/>
-    /// page.GetByText(new Regex("^hello$", RegexOptions.IgnoreCase))
+    /// page.GetByText(new Regex("^hello$", RegexOptions.IgnoreCase));
     /// </code>
     /// <para>**Details**</para>
     /// <para>
@@ -1172,19 +1188,19 @@ public partial interface IPage
     /// <para>You can locate by text substring, exact string, or a regular expression:</para>
     /// <code>
     /// // Matches &lt;span&gt;<br/>
-    /// page.GetByText("world")<br/>
+    /// page.GetByText("world");<br/>
     /// <br/>
     /// // Matches first &lt;div&gt;<br/>
-    /// page.GetByText("Hello world")<br/>
+    /// page.GetByText("Hello world");<br/>
     /// <br/>
     /// // Matches second &lt;div&gt;<br/>
-    /// page.GetByText("Hello", new() { Exact: true })<br/>
+    /// page.GetByText("Hello", new() { Exact = true });<br/>
     /// <br/>
     /// // Matches both &lt;div&gt;s<br/>
-    /// page.GetByText(new Regex("Hello"))<br/>
+    /// page.GetByText(new Regex("Hello"));<br/>
     /// <br/>
     /// // Matches second &lt;div&gt;<br/>
-    /// page.GetByText(new Regex("^hello$", RegexOptions.IgnoreCase))
+    /// page.GetByText(new Regex("^hello$", RegexOptions.IgnoreCase));
     /// </code>
     /// <para>**Details**</para>
     /// <para>
@@ -1535,8 +1551,8 @@ public partial interface IPage
     /// <para>**Usage**</para>
     /// <code>
     /// // Generates a PDF with 'screen' media type<br/>
-    /// await page.EmulateMediaAsync(new PageEmulateMediaOptions { Media = Media.Screen });<br/>
-    /// await page.PdfAsync(new PagePdfOptions { Path = "page.pdf" });
+    /// await page.EmulateMediaAsync(new() { Media = Media.Screen });<br/>
+    /// await page.PdfAsync(new() { Path = "page.pdf" });
     /// </code>
     /// <para>
     /// The <paramref name="width"/>, <paramref name="height"/>, and <paramref name="margin"/>
@@ -1627,11 +1643,11 @@ public partial interface IPage
     /// var page = await browser.NewPageAsync();<br/>
     /// await page.GotoAsync("https://keycode.info");<br/>
     /// await page.PressAsync("body", "A");<br/>
-    /// await page.ScreenshotAsync(new PageScreenshotOptions { Path = "A.png" });<br/>
+    /// await page.ScreenshotAsync(new() { Path = "A.png" });<br/>
     /// await page.PressAsync("body", "ArrowLeft");<br/>
-    /// await page.ScreenshotAsync(new PageScreenshotOptions { Path = "ArrowLeft.png" });<br/>
+    /// await page.ScreenshotAsync(new() { Path = "ArrowLeft.png" });<br/>
     /// await page.PressAsync("body", "Shift+O");<br/>
-    /// await page.ScreenshotAsync(new PageScreenshotOptions { Path = "O.png" });
+    /// await page.ScreenshotAsync(new() { Path = "O.png" });
     /// </code>
     /// </summary>
     /// <param name="selector">
@@ -1713,7 +1729,7 @@ public partial interface IPage
     /// await page.RouteAsync("/api/**", async r =&gt;<br/>
     /// {<br/>
     ///   if (r.Request.PostData.Contains("my-string"))<br/>
-    ///       await r.FulfillAsync(new RouteFulfillOptions { Body = "mocked-data" });<br/>
+    ///       await r.FulfillAsync(new() { Body = "mocked-data" });<br/>
     ///   else<br/>
     ///       await r.ContinueAsync();<br/>
     /// });
@@ -1771,7 +1787,7 @@ public partial interface IPage
     /// await page.RouteAsync("/api/**", async r =&gt;<br/>
     /// {<br/>
     ///   if (r.Request.PostData.Contains("my-string"))<br/>
-    ///       await r.FulfillAsync(new RouteFulfillOptions { Body = "mocked-data" });<br/>
+    ///       await r.FulfillAsync(new() { Body = "mocked-data" });<br/>
     ///   else<br/>
     ///       await r.ContinueAsync();<br/>
     /// });
@@ -1829,7 +1845,7 @@ public partial interface IPage
     /// await page.RouteAsync("/api/**", async r =&gt;<br/>
     /// {<br/>
     ///   if (r.Request.PostData.Contains("my-string"))<br/>
-    ///       await r.FulfillAsync(new RouteFulfillOptions { Body = "mocked-data" });<br/>
+    ///       await r.FulfillAsync(new() { Body = "mocked-data" });<br/>
     ///   else<br/>
     ///       await r.ContinueAsync();<br/>
     /// });
@@ -2702,8 +2718,9 @@ public partial interface IPage
     /// <item><description><c>'load'</c> - wait for the <c>load</c> event to be fired.</description></item>
     /// <item><description><c>'domcontentloaded'</c> - wait for the <c>DOMContentLoaded</c> event to be fired.</description></item>
     /// <item><description>
-    /// <c>'networkidle'</c> - wait until there are no network connections for at least
-    /// <c>500</c> ms.
+    /// <c>'networkidle'</c> - **DISCOURAGED** wait until there are no network connections
+    /// for at least <c>500</c> ms. Don't use this method for testing, rely on web assertions
+    /// to assess readiness instead.
     /// </description></item>
     /// </list>
     /// </param>
@@ -3191,6 +3208,10 @@ public partial interface IPage
 
     /// <summary>
     /// <para>
+    /// Use web assertions that assert visibility or a locator-based <see cref="ILocator.WaitForAsync"/>
+    /// instead. Read more about <a href="https://playwright.dev/dotnet/docs/locators">locators</a>.
+    /// </para>
+    /// <para>
     /// Returns when element specified by selector satisfies <paramref name="state"/> option.
     /// Returns <c>null</c> if waiting for <c>hidden</c> or <c>detached</c>.
     /// </para>
@@ -3239,6 +3260,10 @@ public partial interface IPage
     Task<IElementHandle?> WaitForSelectorAsync(string selector, PageWaitForSelectorOptions? options = default);
 
     /// <summary>
+    /// <para>
+    /// Never wait for timeout in production. Tests that wait for time are inherently flaky.
+    /// Use <see cref="ILocator"/> actions and web assertions that wait automatically.
+    /// </para>
     /// <para>Waits for the given <paramref name="timeout"/> in milliseconds.</para>
     /// <para>
     /// Note that <c>page.waitForTimeout()</c> should only be used for debugging. Tests

@@ -99,7 +99,7 @@ internal class ElementHandleChannel : JSHandleChannel, IChannel<ElementHandle>
                 ["selector"] = selector,
             });
 
-    internal async Task<byte[]> ScreenshotAsync(string path, bool? omitBackground, ScreenshotType? type, int? quality, IEnumerable<ILocator> mask, ScreenshotAnimations? animations, ScreenshotCaret? caret, ScreenshotScale? scale, float? timeout)
+    internal async Task<byte[]> ScreenshotAsync(string path, bool? omitBackground, ScreenshotType? type, int? quality, IEnumerable<ILocator> mask, string maskColor, ScreenshotAnimations? animations, ScreenshotCaret? caret, ScreenshotScale? scale, float? timeout)
     {
         var args = new Dictionary<string, object>
         {
@@ -111,6 +111,7 @@ internal class ElementHandleChannel : JSHandleChannel, IChannel<ElementHandle>
             ["caret"] = caret,
             ["scale"] = scale,
             ["quality"] = quality,
+            ["maskColor"] = maskColor,
         };
         if (mask != null)
         {
@@ -303,7 +304,11 @@ internal class ElementHandleChannel : JSHandleChannel, IChannel<ElementHandle>
             ["name"] = name,
         };
 
-        return (await Connection.SendMessageToServerAsync(Guid, "getAttribute", args).ConfigureAwait(false))?.GetProperty("value").ToString();
+        if ((await Connection.SendMessageToServerAsync(Guid, "getAttribute", args).ConfigureAwait(false))?.TryGetProperty("value", out var value) ?? false)
+        {
+            return value.ToString();
+        }
+        return null;
     }
 
     internal async Task<string> InnerHTMLAsync()

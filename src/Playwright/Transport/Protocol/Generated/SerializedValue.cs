@@ -33,7 +33,7 @@ internal class SerializedValue
     public int? N { get; set; }
 
     [JsonPropertyName("b")]
-    public bool B { get; set; }
+    public bool? B { get; set; }
 
     [JsonPropertyName("s")]
     public string S { get; set; }
@@ -46,6 +46,9 @@ internal class SerializedValue
 
     [JsonPropertyName("u")]
     public string U { get; set; }
+
+    [JsonPropertyName("bi")]
+    public string Bi { get; set; }
 
     [JsonPropertyName("r")]
     public SerializedValueR R { get; set; }

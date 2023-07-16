@@ -27,6 +27,7 @@ using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
 using System.Linq;
+using System.Runtime.CompilerServices;
 using System.Text.Json;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
@@ -42,19 +43,55 @@ internal class BrowserContext : ChannelOwnerBase, IChannelOwner<BrowserContext>,
     private readonly TaskCompletionSource<bool> _closeTcs = new();
     private readonly Dictionary<string, Delegate> _bindings = new();
     private readonly BrowserContextInitializer _initializer;
-    internal readonly ITracing _tracing;
+    internal readonly Tracing _tracing;
     internal readonly IAPIRequestContext _request;
     private readonly IDictionary<string, HarRecorder> _harRecorders = new Dictionary<string, HarRecorder>();
     internal readonly List<IWorker> _serviceWorkers = new();
     private List<RouteHandler> _routes = new();
     internal readonly List<Page> _pages = new();
+    private readonly Browser _browser;
+    private bool _closeWasCalled;
 
     internal TimeoutSettings _timeoutSettings = new();
 
     internal BrowserContext(IChannelOwner parent, string guid, BrowserContextInitializer initializer) : base(parent, guid)
     {
+        _browser = parent as Browser;
+        _browser?._contexts.Add(this);
         Channel = new(guid, parent.Connection, this);
         Channel.Close += (_, _) => OnClose();
+        Channel.Console += (_, consoleMessage) =>
+        {
+            _consoleImpl?.Invoke(this, consoleMessage);
+            if (consoleMessage.Page != null)
+            {
+                (consoleMessage.Page as Page).FireConsole(consoleMessage);
+            }
+        };
+        Channel.Dialog += (_, dialog) =>
+        {
+            bool hasListeners = _dialogImpl?.GetInvocationList().Length > 0 || ((dialog?.Page as Page)?.HasDialogListenersAttached() ?? false);
+            if (!hasListeners)
+            {
+                // Although we do similar handling on the server side, we still need this logic
+                // on the client side due to a possible race condition between two async calls:
+                // a) removing "dialog" listener subscription (client->server)
+                // b) actual "dialog" event (server->client)
+                if ("beforeunload".Equals(dialog.Type, StringComparison.Ordinal))
+                {
+                    dialog.AcceptAsync().IgnoreException();
+                }
+                else
+                {
+                    dialog.DismissAsync().IgnoreException();
+                }
+            }
+            else
+            {
+                _dialogImpl?.Invoke(this, dialog);
+                (dialog.Page as Page)?.FireDialog(dialog);
+            }
+        };
         Channel.Page += Channel_OnPage;
         Channel.BindingCall += Channel_BindingCall;
         Channel.Route += Channel_Route;
@@ -95,7 +132,6 @@ internal class BrowserContext : ChannelOwnerBase, IChannelOwner<BrowserContext>,
         _tracing = initializer.Tracing;
         _request = initializer.RequestContext;
         _initializer = initializer;
-        Browser = parent as IBrowser;
     }
 
     private event EventHandler<IRequest> _requestImpl;
@@ -106,7 +142,23 @@ internal class BrowserContext : ChannelOwnerBase, IChannelOwner<BrowserContext>,
 
     private event EventHandler<IRequest> _requestFailedImpl;
 
+    private event EventHandler<IConsoleMessage> _consoleImpl;
+
+    private event EventHandler<IDialog> _dialogImpl;
+
     public event EventHandler<IBrowserContext> Close;
+
+    public event EventHandler<IConsoleMessage> Console
+    {
+        add => this._consoleImpl = UpdateEventHandler("console", this._consoleImpl, value, true);
+        remove => this._consoleImpl = UpdateEventHandler("console", this._consoleImpl, value, false);
+    }
+
+    public event EventHandler<IDialog> Dialog
+    {
+        add => this._dialogImpl = UpdateEventHandler("dialog", this._dialogImpl, value, true);
+        remove => this._dialogImpl = UpdateEventHandler("dialog", this._dialogImpl, value, false);
+    }
 
     public event EventHandler<IPage> Page;
 
@@ -146,7 +198,7 @@ internal class BrowserContext : ChannelOwnerBase, IChannelOwner<BrowserContext>,
 
     IChannel<BrowserContext> IChannelOwner<BrowserContext>.Channel => Channel;
 
-    public IBrowser Browser { get; }
+    public IBrowser Browser => _browser;
 
     public IReadOnlyList<IPage> Pages => _pages;
 
@@ -162,8 +214,10 @@ internal class BrowserContext : ChannelOwnerBase, IChannelOwner<BrowserContext>,
 
     public IReadOnlyList<IWorker> ServiceWorkers => _serviceWorkers;
 
+    [MethodImpl(MethodImplOptions.NoInlining)]
     public Task AddCookiesAsync(IEnumerable<Cookie> cookies) => Channel.AddCookiesAsync(cookies);
 
+    [MethodImpl(MethodImplOptions.NoInlining)]
     public Task AddInitScriptAsync(string script = null, string scriptPath = null)
     {
         if (string.IsNullOrEmpty(script))
@@ -174,13 +228,22 @@ internal class BrowserContext : ChannelOwnerBase, IChannelOwner<BrowserContext>,
         return Channel.AddInitScriptAsync(script);
     }
 
+    [MethodImpl(MethodImplOptions.NoInlining)]
     public Task ClearCookiesAsync() => Channel.ClearCookiesAsync();
 
+    [MethodImpl(MethodImplOptions.NoInlining)]
     public Task ClearPermissionsAsync() => Channel.ClearPermissionsAsync();
 
+    [MethodImpl(MethodImplOptions.NoInlining)]
     public async Task CloseAsync()
     {
-        try
+        if (_closeWasCalled)
+        {
+            return;
+        }
+        _closeWasCalled = true;
+        await WrapApiCallAsync(
+            async () =>
         {
             foreach (var harRecorder in _harRecorders)
             {
@@ -199,82 +262,102 @@ internal class BrowserContext : ChannelOwnerBase, IChannelOwner<BrowserContext>,
                 }
                 await artifact.DeleteAsync().ConfigureAwait(false);
             }
-            await Channel.CloseAsync().ConfigureAwait(false);
-            await _closeTcs.Task.ConfigureAwait(false);
-        }
-        catch (Exception e) when (DriverMessages.IsSafeCloseError(e))
-        {
-            // Swallow exception
-        }
+        },
+            true).ConfigureAwait(false);
+        await Channel.CloseAsync().ConfigureAwait(false);
+        await _closeTcs.Task.ConfigureAwait(false);
     }
 
-    internal void SetBrowserType(BrowserType browserType)
+    internal void SetOptions(BrowserNewContextOptions contextOptions, string tracesDir)
     {
+        Options = contextOptions;
         if (!string.IsNullOrEmpty(Options?.RecordHarPath))
         {
             _harRecorders.Add(string.Empty, new() { Path = Options.RecordHarPath, Content = Options.RecordHarContent });
         }
+        _tracing._tracesDir = tracesDir;
     }
 
+    [MethodImpl(MethodImplOptions.NoInlining)]
     public Task<IReadOnlyList<BrowserContextCookiesResult>> CookiesAsync(IEnumerable<string> urls = null) => Channel.CookiesAsync(urls);
 
+    [MethodImpl(MethodImplOptions.NoInlining)]
     public Task ExposeBindingAsync(string name, Action callback, BrowserContextExposeBindingOptions options = default)
         => ExposeBindingAsync(name, callback, handle: options?.Handle ?? false);
 
+    [MethodImpl(MethodImplOptions.NoInlining)]
     public Task ExposeBindingAsync(string name, Action<BindingSource> callback)
         => ExposeBindingAsync(name, (Delegate)callback);
 
+    [MethodImpl(MethodImplOptions.NoInlining)]
     public Task ExposeBindingAsync<T>(string name, Action<BindingSource, T> callback)
         => ExposeBindingAsync(name, (Delegate)callback);
 
+    [MethodImpl(MethodImplOptions.NoInlining)]
     public Task ExposeBindingAsync<TResult>(string name, Func<BindingSource, TResult> callback)
         => ExposeBindingAsync(name, (Delegate)callback);
 
+    [MethodImpl(MethodImplOptions.NoInlining)]
     public Task ExposeBindingAsync<TResult>(string name, Func<BindingSource, IJSHandle, TResult> callback)
         => ExposeBindingAsync(name, callback, true);
 
+    [MethodImpl(MethodImplOptions.NoInlining)]
     public Task ExposeBindingAsync<T, TResult>(string name, Func<BindingSource, T, TResult> callback)
         => ExposeBindingAsync(name, (Delegate)callback);
 
+    [MethodImpl(MethodImplOptions.NoInlining)]
     public Task ExposeBindingAsync<T1, T2, TResult>(string name, Func<BindingSource, T1, T2, TResult> callback)
         => ExposeBindingAsync(name, (Delegate)callback);
 
+    [MethodImpl(MethodImplOptions.NoInlining)]
     public Task ExposeBindingAsync<T1, T2, T3, TResult>(string name, Func<BindingSource, T1, T2, T3, TResult> callback)
         => ExposeBindingAsync(name, (Delegate)callback);
 
+    [MethodImpl(MethodImplOptions.NoInlining)]
     public Task ExposeBindingAsync<T1, T2, T3, T4, TResult>(string name, Func<BindingSource, T1, T2, T3, T4, TResult> callback)
         => ExposeBindingAsync(name, (Delegate)callback);
 
+    [MethodImpl(MethodImplOptions.NoInlining)]
     public Task ExposeFunctionAsync(string name, Action callback)
         => ExposeBindingAsync(name, (BindingSource _) => callback());
 
+    [MethodImpl(MethodImplOptions.NoInlining)]
     public Task ExposeFunctionAsync<T>(string name, Action<T> callback)
         => ExposeBindingAsync(name, (BindingSource _, T t) => callback(t));
 
+    [MethodImpl(MethodImplOptions.NoInlining)]
     public Task ExposeFunctionAsync<TResult>(string name, Func<TResult> callback)
         => ExposeBindingAsync(name, (BindingSource _) => callback());
 
+    [MethodImpl(MethodImplOptions.NoInlining)]
     public Task ExposeFunctionAsync<T, TResult>(string name, Func<T, TResult> callback)
         => ExposeBindingAsync(name, (BindingSource _, T t) => callback(t));
 
+    [MethodImpl(MethodImplOptions.NoInlining)]
     public Task ExposeFunctionAsync<T1, T2, TResult>(string name, Func<T1, T2, TResult> callback)
         => ExposeBindingAsync(name, (BindingSource _, T1 t1, T2 t2) => callback(t1, t2));
 
+    [MethodImpl(MethodImplOptions.NoInlining)]
     public Task ExposeFunctionAsync<T1, T2, T3, TResult>(string name, Func<T1, T2, T3, TResult> callback)
         => ExposeBindingAsync(name, (BindingSource _, T1 t1, T2 t2, T3 t3) => callback(t1, t2, t3));
 
+    [MethodImpl(MethodImplOptions.NoInlining)]
     public Task ExposeFunctionAsync<T1, T2, T3, T4, TResult>(string name, Func<T1, T2, T3, T4, TResult> callback)
         => ExposeBindingAsync(name, (BindingSource _, T1 t1, T2 t2, T3 t3, T4 t4) => callback(t1, t2, t3, t4));
 
+    [MethodImpl(MethodImplOptions.NoInlining)]
     public Task GrantPermissionsAsync(IEnumerable<string> permissions, BrowserContextGrantPermissionsOptions options = default)
         => Channel.GrantPermissionsAsync(permissions, options?.Origin);
 
+    [MethodImpl(MethodImplOptions.NoInlining)]
     public async Task<ICDPSession> NewCDPSessionAsync(IPage page)
         => (await Channel.NewCDPSessionAsync(page as Page).ConfigureAwait(false)).Object;
 
+    [MethodImpl(MethodImplOptions.NoInlining)]
     public async Task<ICDPSession> NewCDPSessionAsync(IFrame frame)
         => (await Channel.NewCDPSessionAsync(frame as Frame).ConfigureAwait(false)).Object;
 
+    [MethodImpl(MethodImplOptions.NoInlining)]
     public async Task<IPage> NewPageAsync()
     {
         if (OwnerPage != null)
@@ -285,31 +368,41 @@ internal class BrowserContext : ChannelOwnerBase, IChannelOwner<BrowserContext>,
         return (await Channel.NewPageAsync().ConfigureAwait(false)).Object;
     }
 
+    [MethodImpl(MethodImplOptions.NoInlining)]
     public Task RouteAsync(string url, Action<IRoute> handler, BrowserContextRouteOptions options = default)
         => RouteAsync(new Regex(CombineUrlWithBase(url).GlobToRegex()), null, handler, options);
 
+    [MethodImpl(MethodImplOptions.NoInlining)]
     public Task RouteAsync(string url, Func<IRoute, Task> handler, BrowserContextRouteOptions options = null)
         => RouteAsync(new Regex(CombineUrlWithBase(url).GlobToRegex()), null, handler, options);
 
+    [MethodImpl(MethodImplOptions.NoInlining)]
     public Task RouteAsync(Regex url, Action<IRoute> handler, BrowserContextRouteOptions options = default)
         => RouteAsync(url, null, handler, options);
 
+    [MethodImpl(MethodImplOptions.NoInlining)]
     public Task RouteAsync(Regex url, Func<IRoute, Task> handler, BrowserContextRouteOptions options = default)
         => RouteAsync(url, null, handler, options);
 
+    [MethodImpl(MethodImplOptions.NoInlining)]
     public Task RouteAsync(Func<string, bool> url, Action<IRoute> handler, BrowserContextRouteOptions options = default)
         => RouteAsync(null, url, handler, options);
 
+    [MethodImpl(MethodImplOptions.NoInlining)]
     public Task RouteAsync(Func<string, bool> url, Func<IRoute, Task> handler, BrowserContextRouteOptions options = default)
         => RouteAsync(null, url, handler, options);
 
+    [MethodImpl(MethodImplOptions.NoInlining)]
     public Task SetExtraHTTPHeadersAsync(IEnumerable<KeyValuePair<string, string>> headers)
         => Channel.SetExtraHTTPHeadersAsync(headers);
 
+    [MethodImpl(MethodImplOptions.NoInlining)]
     public Task SetGeolocationAsync(Geolocation geolocation) => Channel.SetGeolocationAsync(geolocation);
 
+    [MethodImpl(MethodImplOptions.NoInlining)]
     public Task SetOfflineAsync(bool offline) => Channel.SetOfflineAsync(offline);
 
+    [MethodImpl(MethodImplOptions.NoInlining)]
     public async Task<string> StorageStateAsync(BrowserContextStorageStateOptions options = default)
     {
         string state = JsonSerializer.Serialize(
@@ -324,24 +417,31 @@ internal class BrowserContext : ChannelOwnerBase, IChannelOwner<BrowserContext>,
         return state;
     }
 
+    [MethodImpl(MethodImplOptions.NoInlining)]
     public Task UnrouteAsync(string urlString, Action<IRoute> handler = default)
         => UnrouteAsync(new Regex(CombineUrlWithBase(urlString).GlobToRegex()), null, handler);
 
+    [MethodImpl(MethodImplOptions.NoInlining)]
     public Task UnrouteAsync(string urlString, Func<IRoute, Task> handler = null)
         => UnrouteAsync(new Regex(CombineUrlWithBase(urlString).GlobToRegex()), null, handler);
 
+    [MethodImpl(MethodImplOptions.NoInlining)]
     public Task UnrouteAsync(Regex urlRegex, Action<IRoute> handler = default)
         => UnrouteAsync(urlRegex, null, handler);
 
+    [MethodImpl(MethodImplOptions.NoInlining)]
     public Task UnrouteAsync(Regex urlRegex, Func<IRoute, Task> handler = default)
         => UnrouteAsync(urlRegex, null, handler);
 
+    [MethodImpl(MethodImplOptions.NoInlining)]
     public Task UnrouteAsync(Func<string, bool> urlFunc, Action<IRoute> handler = default)
         => UnrouteAsync(null, urlFunc, handler);
 
+    [MethodImpl(MethodImplOptions.NoInlining)]
     public Task UnrouteAsync(Func<string, bool> urlFunc, Func<IRoute, Task> handler = default)
         => UnrouteAsync(null, urlFunc, handler);
 
+    [MethodImpl(MethodImplOptions.NoInlining)]
     public async Task<T> InnerWaitForEventAsync<T>(PlaywrightEvent<T> playwrightEvent, Func<Task> action = default, Func<T, bool> predicate = default, float? timeout = default)
     {
         if (playwrightEvent == null)
@@ -361,27 +461,44 @@ internal class BrowserContext : ChannelOwnerBase, IChannelOwner<BrowserContext>,
         var result = waiter.WaitForEventAsync(this, playwrightEvent.Name, predicate);
         if (action != null)
         {
-            await WrapApiBoundaryAsync(() => Task.WhenAll(result, action())).ConfigureAwait(false);
+            await WrapApiBoundaryAsync(() => waiter.CancelWaitOnExceptionAsync(result, action)).ConfigureAwait(false);
         }
 
         return await result.ConfigureAwait(false);
     }
 
+    [MethodImpl(MethodImplOptions.NoInlining)]
     public Task<IPage> WaitForPageAsync(BrowserContextWaitForPageOptions options = default)
         => InnerWaitForEventAsync(BrowserContextEvent.Page, null, options?.Predicate, options?.Timeout);
 
+    [MethodImpl(MethodImplOptions.NoInlining)]
     public Task<IPage> RunAndWaitForPageAsync(Func<Task> action, BrowserContextRunAndWaitForPageOptions options = default)
         => InnerWaitForEventAsync(BrowserContextEvent.Page, action, options?.Predicate, options?.Timeout);
 
+    [MethodImpl(MethodImplOptions.NoInlining)]
+    public Task<IConsoleMessage> WaitForConsoleMessageAsync(BrowserContextWaitForConsoleMessageOptions options = default)
+        => InnerWaitForEventAsync(PageEvent.Console, null, options?.Predicate, options?.Timeout);
+
+    [MethodImpl(MethodImplOptions.NoInlining)]
+    public Task<IConsoleMessage> RunAndWaitForConsoleMessageAsync(Func<Task> action, BrowserContextRunAndWaitForConsoleMessageOptions options = default)
+        => InnerWaitForEventAsync(PageEvent.Console, action, options?.Predicate, options?.Timeout);
+
+    [MethodImpl(MethodImplOptions.NoInlining)]
     public ValueTask DisposeAsync() => new(CloseAsync());
 
-    public void SetDefaultNavigationTimeout(float timeout)
+    [MethodImpl(MethodImplOptions.NoInlining)]
+    public void SetDefaultNavigationTimeout(float timeout) => SetDefaultNavigationTimeoutImpl(timeout);
+
+    internal void SetDefaultNavigationTimeoutImpl(float? timeout)
     {
         _timeoutSettings.SetDefaultNavigationTimeout(timeout);
         WrapApiCallAsync(() => Channel.SetDefaultNavigationTimeoutNoReplyAsync(timeout), true).IgnoreException();
     }
 
-    public void SetDefaultTimeout(float timeout)
+    [MethodImpl(MethodImplOptions.NoInlining)]
+    public void SetDefaultTimeout(float timeout) => SetDefaultTimeoutImpl(timeout);
+
+    internal void SetDefaultTimeoutImpl(float? timeout)
     {
         _timeoutSettings.SetDefaultTimeout(timeout);
         WrapApiCallAsync(() => Channel.SetDefaultTimeoutNoReplyAsync(timeout), true).IgnoreException();
@@ -510,7 +627,7 @@ internal class BrowserContext : ChannelOwnerBase, IChannelOwner<BrowserContext>,
         }
     }
 
-    private void Channel_Route(object sender, Route route) => OnRouteAsync(route).ConfigureAwait(false);
+    private void Channel_Route(object sender, Route route) => _ = OnRouteAsync(route).ConfigureAwait(false);
 
     private Task ExposeBindingAsync(string name, Delegate callback, bool handle = false)
     {
@@ -532,17 +649,34 @@ internal class BrowserContext : ChannelOwnerBase, IChannelOwner<BrowserContext>,
         return Channel.ExposeBindingAsync(name, handle);
     }
 
+    private HarContentPolicy? RouteFromHarUpdateContentPolicyToHarContentPolicy(RouteFromHarUpdateContentPolicy? policy)
+    {
+        switch (policy)
+        {
+            case RouteFromHarUpdateContentPolicy.Attach:
+                return HarContentPolicy.Attach;
+            case RouteFromHarUpdateContentPolicy.Embed:
+                return HarContentPolicy.Embed;
+            default:
+                return null;
+        }
+    }
+
     internal async Task RecordIntoHarAsync(string har, Page page, BrowserContextRouteFromHAROptions options)
     {
+        var contentPolicy = RouteFromHarUpdateContentPolicyToHarContentPolicy(options?.UpdateContent);
         var harId = await Channel.HarStartAsync(
             page,
             har,
             options?.Url,
             options?.UrlString,
-            options?.UrlRegex).ConfigureAwait(false);
-        _harRecorders.Add(harId, new() { Path = har, Content = HarContentPolicy.Attach });
+            options?.UrlRegex,
+            contentPolicy,
+            options?.UpdateMode).ConfigureAwait(false);
+        _harRecorders.Add(harId, new() { Path = har, Content = contentPolicy ?? HarContentPolicy.Attach });
     }
 
+    [MethodImpl(MethodImplOptions.NoInlining)]
     public async Task RouteFromHARAsync(string har, BrowserContextRouteFromHAROptions options = null)
     {
         if (options?.Update == true)

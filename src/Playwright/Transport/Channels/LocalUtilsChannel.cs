@@ -37,11 +37,14 @@ internal class LocalUtilsChannel : Channel<LocalUtils>
     {
     }
 
-    internal Task ZipAsync(string zipFile, List<NameValue> entries) =>
+    internal Task ZipAsync(string zipFile, List<NameValue> entries, string mode, string stacksId, bool includeSources) =>
         Connection.SendMessageToServerAsync(Guid, "zip", new Dictionary<string, object>
         {
-                  { "zipFile", zipFile },
-                  { "entries", entries },
+                { "zipFile", zipFile },
+                { "entries", entries },
+                { "mode", mode },
+                { "stacksId", stacksId },
+                { "includeSources", includeSources },
         });
 
     internal async Task<(string HarId, string Error)> HarOpenAsync(string file)
@@ -86,7 +89,7 @@ internal class LocalUtilsChannel : Channel<LocalUtils>
                   { "harFile", harFile },
         });
 
-    internal Task<JsonPipeChannel> ConnectAsync(string wsEndpoint, IEnumerable<KeyValuePair<string, string>> headers, float? slowMo, float? timeout)
+    internal async Task<JsonPipe> ConnectAsync(string wsEndpoint, IEnumerable<KeyValuePair<string, string>> headers, float? slowMo, float? timeout)
     {
         var args = new Dictionary<string, object>
             {
@@ -95,6 +98,34 @@ internal class LocalUtilsChannel : Channel<LocalUtils>
                 { "slowMo", slowMo },
                 { "timeout", timeout },
             };
-        return Connection.SendMessageToServerAsync<JsonPipeChannel>(Guid, "connect", args);
+        return (await Connection.SendMessageToServerAsync(Guid, "connect", args).ConfigureAwait(false)).Value.GetObject<JsonPipe>("pipe", Connection);
+    }
+
+    internal void AddStackToTracingNoReply(List<StackFrame> frames, int id)
+        => Connection.SendMessageToServerAsync(Guid, "addStackToTracingNoReply", new Dictionary<string, object>
+        {
+            {
+                "callData", new ClientSideCallMetadata()
+                {
+                    Id = id,
+                    Stack = frames,
+                }
+            },
+        }).IgnoreException();
+
+    internal Task TraceDiscardedAsync(string stacksId)
+        => Connection.SendMessageToServerAsync(Guid, "traceDiscarded", new Dictionary<string, object>
+        {
+            { "stacksId", stacksId },
+        });
+
+    internal async Task<string> TracingStartedAsync(string tracesDir, string traceName)
+    {
+        var response = await Connection.SendMessageToServerAsync(Guid, "tracingStarted", new Dictionary<string, object>
+        {
+            { "tracesDir", tracesDir },
+            { "traceName", traceName },
+        }).ConfigureAwait(false);
+        return response.GetString("stacksId", true);
     }
 }

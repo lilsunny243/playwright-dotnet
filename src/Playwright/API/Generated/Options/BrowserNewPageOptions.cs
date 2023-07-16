@@ -92,7 +92,7 @@ public class BrowserNewPageOptions
     /// When using <see cref="IPage.GotoAsync"/>, <see cref="IPage.RouteAsync"/>, <see cref="IPage.WaitForURLAsync"/>,
     /// <see cref="IPage.RunAndWaitForRequestAsync"/>, or <see cref="IPage.RunAndWaitForResponseAsync"/>
     /// it takes the base URL in consideration by using the <a href="https://developer.mozilla.org/en-US/docs/Web/API/URL/URL"><c>URL()</c></a>
-    /// constructor for building the corresponding URL. Examples:
+    /// constructor for building the corresponding URL. Unset by default. Examples:
     /// </para>
     /// <list type="bullet">
     /// <item><description>
@@ -112,7 +112,7 @@ public class BrowserNewPageOptions
     [JsonPropertyName("baseURL")]
     public string? BaseURL { get; set; }
 
-    /// <summary><para>Toggles bypassing page's Content-Security-Policy.</para></summary>
+    /// <summary><para>Toggles bypassing page's Content-Security-Policy. Defaults to <c>false</c>.</para></summary>
     [JsonPropertyName("bypassCSP")]
     public bool? BypassCSP { get; set; }
 
@@ -127,11 +127,22 @@ public class BrowserNewPageOptions
     [JsonPropertyName("colorScheme")]
     public ColorScheme? ColorScheme { get; set; }
 
-    /// <summary><para>Specify device scale factor (can be thought of as dpr). Defaults to <c>1</c>.</para></summary>
+    /// <summary>
+    /// <para>
+    /// Specify device scale factor (can be thought of as dpr). Defaults to <c>1</c>. Learn
+    /// more about <a href="https://playwright.dev/dotnet/docs/emulation#devices">emulating
+    /// devices with device scale factor</a>.
+    /// </para>
+    /// </summary>
     [JsonPropertyName("deviceScaleFactor")]
     public float? DeviceScaleFactor { get; set; }
 
-    /// <summary><para>An object containing additional HTTP headers to be sent with every request.</para></summary>
+    /// <summary>
+    /// <para>
+    /// An object containing additional HTTP headers to be sent with every request. Defaults
+    /// to none.
+    /// </para>
+    /// </summary>
     [JsonPropertyName("extraHTTPHeaders")]
     public IEnumerable<KeyValuePair<string, string>>? ExtraHTTPHeaders { get; set; }
 
@@ -148,14 +159,20 @@ public class BrowserNewPageOptions
     [JsonPropertyName("geolocation")]
     public Geolocation? Geolocation { get; set; }
 
-    /// <summary><para>Specifies if viewport supports touch events. Defaults to false.</para></summary>
+    /// <summary>
+    /// <para>
+    /// Specifies if viewport supports touch events. Defaults to false. Learn more about
+    /// <a href="https://playwright.dev/dotnet/docs/emulation#devices">mobile emulation</a>.
+    /// </para>
+    /// </summary>
     [JsonPropertyName("hasTouch")]
     public bool? HasTouch { get; set; }
 
     /// <summary>
     /// <para>
     /// Credentials for <a href="https://developer.mozilla.org/en-US/docs/Web/HTTP/Authentication">HTTP
-    /// authentication</a>.
+    /// authentication</a>. If no origin is specified, the username and password are sent
+    /// to any servers upon unauthorized responses.
     /// </para>
     /// </summary>
     [JsonPropertyName("httpCredentials")]
@@ -168,13 +185,21 @@ public class BrowserNewPageOptions
     /// <summary>
     /// <para>
     /// Whether the <c>meta viewport</c> tag is taken into account and touch events are
-    /// enabled. Defaults to <c>false</c>. Not supported in Firefox.
+    /// enabled. isMobile is a part of device, so you don't actually need to set it manually.
+    /// Defaults to <c>false</c> and is not supported in Firefox. Learn more about <a href="https://playwright.dev/dotnet/docs/emulation#isMobile">mobile
+    /// emulation</a>.
     /// </para>
     /// </summary>
     [JsonPropertyName("isMobile")]
     public bool? IsMobile { get; set; }
 
-    /// <summary><para>Whether or not to enable JavaScript in the context. Defaults to <c>true</c>.</para></summary>
+    /// <summary>
+    /// <para>
+    /// Whether or not to enable JavaScript in the context. Defaults to <c>true</c>. Learn
+    /// more about <a href="https://playwright.dev/dotnet/docs/emulation#javascript-enabled">disabling
+    /// JavaScript</a>.
+    /// </para>
+    /// </summary>
     [JsonPropertyName("javaScriptEnabled")]
     public bool? JavaScriptEnabled { get; set; }
 
@@ -182,26 +207,33 @@ public class BrowserNewPageOptions
     /// <para>
     /// Specify user locale, for example <c>en-GB</c>, <c>de-DE</c>, etc. Locale will affect
     /// <c>navigator.language</c> value, <c>Accept-Language</c> request header value as
-    /// well as number and date formatting rules.
+    /// well as number and date formatting rules. Defaults to the system default locale.
+    /// Learn more about emulation in our <a href="https://playwright.dev/dotnet/docs/emulation#locale--timezone">emulation
+    /// guide</a>.
     /// </para>
     /// </summary>
     [JsonPropertyName("locale")]
     public string? Locale { get; set; }
 
-    /// <summary><para>Whether to emulate network being offline. Defaults to <c>false</c>.</para></summary>
+    /// <summary>
+    /// <para>
+    /// Whether to emulate network being offline. Defaults to <c>false</c>. Learn more about
+    /// <a href="https://playwright.dev/dotnet/docs/emulation#offline">network emulation</a>.
+    /// </para>
+    /// </summary>
     [JsonPropertyName("offline")]
     public bool? Offline { get; set; }
 
     /// <summary>
     /// <para>
     /// A list of permissions to grant to all pages in this context. See <see cref="IBrowserContext.GrantPermissionsAsync"/>
-    /// for more details.
+    /// for more details. Defaults to none.
     /// </para>
     /// </summary>
     [JsonPropertyName("permissions")]
     public IEnumerable<string>? Permissions { get; set; }
 
-    /// <summary><para>Network proxy settings to use with this context.</para></summary>
+    /// <summary><para>Network proxy settings to use with this context. Defaults to none.</para></summary>
     /// <remarks>
     /// <para>
     /// For Chromium on Windows the browser needs to be launched with the global proxy for
@@ -340,8 +372,8 @@ public class BrowserNewPageOptions
     /// If set to true, enables strict selectors mode for this context. In the strict selectors
     /// mode all operations on selectors that imply single target DOM element will throw
     /// when more than one element matches the selector. This option does not affect any
-    /// Locator APIs (Locators are always strict). See <see cref="ILocator"/> to learn more
-    /// about the strict mode.
+    /// Locator APIs (Locators are always strict). Defaults to <c>false</c>. See <see cref="ILocator"/>
+    /// to learn more about the strict mode.
     /// </para>
     /// </summary>
     [JsonPropertyName("strictSelectors")]
@@ -350,7 +382,7 @@ public class BrowserNewPageOptions
     /// <summary>
     /// <para>
     /// Changes the timezone of the context. See <a href="https://cs.chromium.org/chromium/src/third_party/icu/source/data/misc/metaZones.txt?rcl=faee8bc70570192d82d2978a71e2a615788597d1">ICU's
-    /// metaZones.txt</a> for a list of supported timezone IDs.
+    /// metaZones.txt</a> for a list of supported timezone IDs. Defaults to the system timezone.
     /// </para>
     /// </summary>
     [JsonPropertyName("timezoneId")]
@@ -363,7 +395,9 @@ public class BrowserNewPageOptions
     /// <summary>
     /// <para>
     /// Emulates consistent viewport for each page. Defaults to an 1280x720 viewport. Use
-    /// <c>ViewportSize.NoViewport</c> to disable the consistent viewport emulation.
+    /// <c>ViewportSize.NoViewport</c> to disable the consistent viewport emulation. Learn
+    /// more about <a href="https://playwright.dev/dotnet/docs/emulation#viewport">viewport
+    /// emulation</a>.
     /// </para>
     /// </summary>
     /// <remarks>

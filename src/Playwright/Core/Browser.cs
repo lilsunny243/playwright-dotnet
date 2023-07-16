@@ -24,6 +24,7 @@
 
 using System;
 using System.Collections.Generic;
+using System.Runtime.CompilerServices;
 using System.Threading.Tasks;
 using Microsoft.Playwright.Transport;
 using Microsoft.Playwright.Transport.Channels;
@@ -36,6 +37,7 @@ internal class Browser : ChannelOwnerBase, IChannelOwner<Browser>, IBrowser
     private readonly BrowserInitializer _initializer;
     private readonly TaskCompletionSource<bool> _closedTcs = new();
     internal readonly List<BrowserContext> _contexts = new();
+    internal BrowserType _browserType;
 
     internal Browser(IChannelOwner parent, string guid, BrowserInitializer initializer) : base(parent, guid)
     {
@@ -61,17 +63,9 @@ internal class Browser : ChannelOwnerBase, IChannelOwner<Browser>, IBrowser
 
     internal BrowserChannel Channel { get; }
 
-    public IBrowserType BrowserType { get; private set; }
+    public IBrowserType BrowserType => _browserType;
 
-    internal void SetBrowserType(BrowserType browserType)
-    {
-        BrowserType = browserType;
-        foreach (var context in _contexts)
-        {
-            context.SetBrowserType(browserType);
-        }
-    }
-
+    [MethodImpl(MethodImplOptions.NoInlining)]
     public async Task CloseAsync()
     {
         try
@@ -92,6 +86,7 @@ internal class Browser : ChannelOwnerBase, IChannelOwner<Browser>, IBrowser
         }
     }
 
+    [MethodImpl(MethodImplOptions.NoInlining)]
     public async Task<IBrowserContext> NewContextAsync(BrowserNewContextOptions options = default)
     {
         options ??= new();
@@ -130,14 +125,11 @@ internal class Browser : ChannelOwnerBase, IChannelOwner<Browser>, IBrowser
             baseUrl: options.BaseURL,
             strictSelectors: options.StrictSelectors,
             forcedColors: options.ForcedColors).ConfigureAwait(false)).Object;
-
-        context.Options = options;
-
-        _contexts.Add(context);
-        context.SetBrowserType((BrowserType)this.BrowserType);
+        _browserType.DidCreateContext(context, options, null);
         return context;
     }
 
+    [MethodImpl(MethodImplOptions.NoInlining)]
     public async Task<IPage> NewPageAsync(BrowserNewPageOptions options = default)
     {
         options ??= new();
@@ -183,13 +175,17 @@ internal class Browser : ChannelOwnerBase, IChannelOwner<Browser>, IBrowser
 
         var context = (BrowserContext)await NewContextAsync(contextOptions).ConfigureAwait(false);
 
-        var page = (Page)await context.NewPageAsync().ConfigureAwait(false);
-        page.OwnedContext = context;
-        context.Options = contextOptions;
-        context.OwnerPage = page;
-        return page;
+        return await WrapApiCallAsync(async () =>
+        {
+            var page = (Page)await context.NewPageAsync().ConfigureAwait(false);
+            page.OwnedContext = context;
+            context.Options = contextOptions;
+            context.OwnerPage = page;
+            return page;
+        }).ConfigureAwait(false);
     }
 
+    [MethodImpl(MethodImplOptions.NoInlining)]
     public ValueTask DisposeAsync() => new ValueTask(CloseAsync());
 
     internal static Dictionary<string, object> GetVideoArgs(string recordVideoDir, RecordVideoSize recordVideoSize)
@@ -224,6 +220,7 @@ internal class Browser : ChannelOwnerBase, IChannelOwner<Browser>, IBrowser
         _closedTcs.TrySetResult(true);
     }
 
+    [MethodImpl(MethodImplOptions.NoInlining)]
     public async Task<ICDPSession> NewBrowserCDPSessionAsync()
         => (await Channel.NewBrowserCDPSessionAsync().ConfigureAwait(false)).Object;
 }

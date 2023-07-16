@@ -29,23 +29,23 @@ if [[ -z "${GITHUB_SHA}" ]]; then
 fi
 
 FOCAL_TAGS=(
-  "next"
-  "sha-${GITHUB_SHA}"
   "next-focal"
 )
 if [[ "$RELEASE_CHANNEL" == "stable" ]]; then
-  FOCAL_TAGS+=("latest")
   FOCAL_TAGS+=("focal")
   FOCAL_TAGS+=("v${PW_VERSION}-focal")
-  FOCAL_TAGS+=("v${PW_VERSION}")
 fi
 
 JAMMY_TAGS=(
+  "next"
+  "sha-${GITHUB_SHA}"
   "next-jammy"
 )
 if [[ "$RELEASE_CHANNEL" == "stable" ]]; then
+  JAMMY_TAGS+=("latest")
   JAMMY_TAGS+=("jammy")
   JAMMY_TAGS+=("v${PW_VERSION}-jammy")
+  JAMMY_TAGS+=("v${PW_VERSION}")
 fi
 
 tag_and_push() {
@@ -62,7 +62,7 @@ publish_docker_images_with_arch_suffix() {
   if [[ "$FLAVOR" == "focal" ]]; then
     TAGS=("${FOCAL_TAGS[@]}")
   elif [[ "$FLAVOR" == "jammy" ]]; then
-    TAGS=("$JAMMY_TAGS[@]}")
+    TAGS=("${JAMMY_TAGS[@]}")
   else
     echo "ERROR: unknown flavor - $FLAVOR. Must be either 'focal' or 'jammy'"
     exit 1

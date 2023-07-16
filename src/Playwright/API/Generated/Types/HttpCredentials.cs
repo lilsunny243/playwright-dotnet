@@ -40,6 +40,10 @@ public partial class HttpCredentials
     [Required]
     [JsonPropertyName("password")]
     public string Password { get; set; } = default!;
+
+    /// <summary><para>Restrain sending http credentials on specific origin (scheme://host:port).</para></summary>
+    [JsonPropertyName("origin")]
+    public string? Origin { get; set; }
 }
 
 #nullable disable

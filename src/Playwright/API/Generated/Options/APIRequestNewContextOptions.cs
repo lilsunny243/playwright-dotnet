@@ -75,14 +75,20 @@ public class APIRequestNewContextOptions
     [JsonPropertyName("baseURL")]
     public string? BaseURL { get; set; }
 
-    /// <summary><para>An object containing additional HTTP headers to be sent with every request.</para></summary>
+    /// <summary>
+    /// <para>
+    /// An object containing additional HTTP headers to be sent with every request. Defaults
+    /// to none.
+    /// </para>
+    /// </summary>
     [JsonPropertyName("extraHTTPHeaders")]
     public IEnumerable<KeyValuePair<string, string>>? ExtraHTTPHeaders { get; set; }
 
     /// <summary>
     /// <para>
     /// Credentials for <a href="https://developer.mozilla.org/en-US/docs/Web/HTTP/Authentication">HTTP
-    /// authentication</a>.
+    /// authentication</a>. If no origin is specified, the username and password are sent
+    /// to any servers upon unauthorized responses.
     /// </para>
     /// </summary>
     [JsonPropertyName("httpCredentials")]

@@ -554,26 +554,38 @@ public partial interface IFrame
     ILocator GetByAltText(Regex text, FrameGetByAltTextOptions? options = default);
 
     /// <summary>
-    /// <para>Allows locating input elements by the text of the associated label.</para>
+    /// <para>
+    /// Allows locating input elements by the text of the associated <c>&lt;label&gt;</c>
+    /// or <c>aria-labelledby</c> element, or by the <c>aria-label</c> attribute.
+    /// </para>
     /// <para>**Usage**</para>
     /// <para>
-    /// For example, this method will find the input by label text "Password" in the following
-    /// DOM:
+    /// For example, this method will find inputs by label "Username" and "Password" in
+    /// the following DOM:
     /// </para>
-    /// <code>await page.GetByLabel("Password").FillAsync("secret");</code>
+    /// <code>
+    /// await page.GetByLabel("Username").FillAsync("john");<br/>
+    /// await page.GetByLabel("Password").FillAsync("secret");
+    /// </code>
     /// </summary>
     /// <param name="text">Text to locate the element for.</param>
     /// <param name="options">Call options</param>
     ILocator GetByLabel(string text, FrameGetByLabelOptions? options = default);
 
     /// <summary>
-    /// <para>Allows locating input elements by the text of the associated label.</para>
+    /// <para>
+    /// Allows locating input elements by the text of the associated <c>&lt;label&gt;</c>
+    /// or <c>aria-labelledby</c> element, or by the <c>aria-label</c> attribute.
+    /// </para>
     /// <para>**Usage**</para>
     /// <para>
-    /// For example, this method will find the input by label text "Password" in the following
-    /// DOM:
+    /// For example, this method will find inputs by label "Username" and "Password" in
+    /// the following DOM:
     /// </para>
-    /// <code>await page.GetByLabel("Password").FillAsync("secret");</code>
+    /// <code>
+    /// await page.GetByLabel("Username").FillAsync("john");<br/>
+    /// await page.GetByLabel("Password").FillAsync("secret");
+    /// </code>
     /// </summary>
     /// <param name="text">Text to locate the element for.</param>
     /// <param name="options">Call options</param>
@@ -691,19 +703,19 @@ public partial interface IFrame
     /// <para>You can locate by text substring, exact string, or a regular expression:</para>
     /// <code>
     /// // Matches &lt;span&gt;<br/>
-    /// page.GetByText("world")<br/>
+    /// page.GetByText("world");<br/>
     /// <br/>
     /// // Matches first &lt;div&gt;<br/>
-    /// page.GetByText("Hello world")<br/>
+    /// page.GetByText("Hello world");<br/>
     /// <br/>
     /// // Matches second &lt;div&gt;<br/>
-    /// page.GetByText("Hello", new() { Exact: true })<br/>
+    /// page.GetByText("Hello", new() { Exact = true });<br/>
     /// <br/>
     /// // Matches both &lt;div&gt;s<br/>
-    /// page.GetByText(new Regex("Hello"))<br/>
+    /// page.GetByText(new Regex("Hello"));<br/>
     /// <br/>
     /// // Matches second &lt;div&gt;<br/>
-    /// page.GetByText(new Regex("^hello$", RegexOptions.IgnoreCase))
+    /// page.GetByText(new Regex("^hello$", RegexOptions.IgnoreCase));
     /// </code>
     /// <para>**Details**</para>
     /// <para>
@@ -732,19 +744,19 @@ public partial interface IFrame
     /// <para>You can locate by text substring, exact string, or a regular expression:</para>
     /// <code>
     /// // Matches &lt;span&gt;<br/>
-    /// page.GetByText("world")<br/>
+    /// page.GetByText("world");<br/>
     /// <br/>
     /// // Matches first &lt;div&gt;<br/>
-    /// page.GetByText("Hello world")<br/>
+    /// page.GetByText("Hello world");<br/>
     /// <br/>
     /// // Matches second &lt;div&gt;<br/>
-    /// page.GetByText("Hello", new() { Exact: true })<br/>
+    /// page.GetByText("Hello", new() { Exact = true });<br/>
     /// <br/>
     /// // Matches both &lt;div&gt;s<br/>
-    /// page.GetByText(new Regex("Hello"))<br/>
+    /// page.GetByText(new Regex("Hello"));<br/>
     /// <br/>
     /// // Matches second &lt;div&gt;<br/>
-    /// page.GetByText(new Regex("^hello$", RegexOptions.IgnoreCase))
+    /// page.GetByText(new Regex("^hello$", RegexOptions.IgnoreCase));
     /// </code>
     /// <para>**Details**</para>
     /// <para>
@@ -1712,8 +1724,9 @@ public partial interface IFrame
     /// <item><description><c>'load'</c> - wait for the <c>load</c> event to be fired.</description></item>
     /// <item><description><c>'domcontentloaded'</c> - wait for the <c>DOMContentLoaded</c> event to be fired.</description></item>
     /// <item><description>
-    /// <c>'networkidle'</c> - wait until there are no network connections for at least
-    /// <c>500</c> ms.
+    /// <c>'networkidle'</c> - **DISCOURAGED** wait until there are no network connections
+    /// for at least <c>500</c> ms. Don't use this method for testing, rely on web assertions
+    /// to assess readiness instead.
     /// </description></item>
     /// </list>
     /// </param>
@@ -1721,6 +1734,10 @@ public partial interface IFrame
     Task WaitForLoadStateAsync(LoadState? state = default, FrameWaitForLoadStateOptions? options = default);
 
     /// <summary>
+    /// <para>
+    /// **DEPRECATED** This method is inherently racy, please use <see cref="IFrame.WaitForURLAsync"/>
+    /// instead.
+    /// </para>
     /// <para>
     /// Waits for the frame navigation and returns the main resource response. In case of
     /// multiple redirects, the navigation will resolve with the response of the last redirect.
@@ -1749,9 +1766,14 @@ public partial interface IFrame
     /// </para>
     /// </remarks>
     /// <param name="options">Call options</param>
+    [System.Obsolete]
     Task<IResponse?> WaitForNavigationAsync(FrameWaitForNavigationOptions? options = default);
 
     /// <summary>
+    /// <para>
+    /// **DEPRECATED** This method is inherently racy, please use <see cref="IFrame.WaitForURLAsync"/>
+    /// instead.
+    /// </para>
     /// <para>
     /// Waits for the frame navigation and returns the main resource response. In case of
     /// multiple redirects, the navigation will resolve with the response of the last redirect.
@@ -1781,9 +1803,14 @@ public partial interface IFrame
     /// </remarks>
     /// <param name="action">Action that triggers the event.</param>
     /// <param name="options">Call options</param>
+    [System.Obsolete]
     Task<IResponse?> RunAndWaitForNavigationAsync(Func<Task> action, FrameRunAndWaitForNavigationOptions? options = default);
 
     /// <summary>
+    /// <para>
+    /// Use web assertions that assert visibility or a locator-based <see cref="ILocator.WaitForAsync"/>
+    /// instead. Read more about <a href="https://playwright.dev/dotnet/docs/locators">locators</a>.
+    /// </para>
     /// <para>
     /// Returns when element specified by selector satisfies <paramref name="state"/> option.
     /// Returns <c>null</c> if waiting for <c>hidden</c> or <c>detached</c>.
@@ -1831,6 +1858,10 @@ public partial interface IFrame
     Task<IElementHandle?> WaitForSelectorAsync(string selector, FrameWaitForSelectorOptions? options = default);
 
     /// <summary>
+    /// <para>
+    /// Never wait for timeout in production. Tests that wait for time are inherently flaky.
+    /// Use <see cref="ILocator"/> actions and web assertions that wait automatically.
+    /// </para>
     /// <para>Waits for the given <paramref name="timeout"/> in milliseconds.</para>
     /// <para>
     /// Note that <c>frame.waitForTimeout()</c> should only be used for debugging. Tests

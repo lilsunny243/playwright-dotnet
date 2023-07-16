@@ -24,6 +24,7 @@
 
 using System.Collections.Generic;
 using System.Linq;
+using System.Runtime.CompilerServices;
 using System.Text;
 using System.Text.Json;
 using System.Threading.Tasks;
@@ -37,7 +38,7 @@ namespace Microsoft.Playwright.Core;
 internal class Request : ChannelOwnerBase, IChannelOwner<Request>, IRequest
 {
     private readonly RequestChannel _channel;
-    private readonly RequestInitializer _initializer;
+    internal readonly RequestInitializer _initializer;
     private readonly RawHeaders _provisionalHeaders;
     private readonly RouteFallbackOptions _fallbackOverrides = new();
     private Task<RawHeaders> _rawHeadersTask;
@@ -131,8 +132,10 @@ internal class Request : ChannelOwnerBase, IChannelOwner<Request>, IRequest
 
     internal BrowserContext _context => (BrowserContext)Frame.Page.Context;
 
+    [MethodImpl(MethodImplOptions.NoInlining)]
     public async Task<IResponse> ResponseAsync() => (await _channel.GetResponseAsync().ConfigureAwait(false))?.Object;
 
+    [MethodImpl(MethodImplOptions.NoInlining)]
     public JsonElement? PostDataJSON()
     {
         if (PostData == null)
@@ -163,6 +166,7 @@ internal class Request : ChannelOwnerBase, IChannelOwner<Request>, IRequest
         return JsonDocument.Parse(content).RootElement;
     }
 
+    [MethodImpl(MethodImplOptions.NoInlining)]
     public async Task<RequestSizesResult> SizesAsync()
     {
         if (await ResponseAsync().ConfigureAwait(false) is not IChannelOwner<Response> res)
@@ -173,12 +177,15 @@ internal class Request : ChannelOwnerBase, IChannelOwner<Request>, IRequest
         return await ((ResponseChannel)res.Channel).SizesAsync().ConfigureAwait(false);
     }
 
+    [MethodImpl(MethodImplOptions.NoInlining)]
     public async Task<Dictionary<string, string>> AllHeadersAsync()
         => (await ActualHeadersAsync().ConfigureAwait(false)).Headers;
 
+    [MethodImpl(MethodImplOptions.NoInlining)]
     public async Task<IReadOnlyList<Header>> HeadersArrayAsync()
         => (await ActualHeadersAsync().ConfigureAwait(false)).HeadersArray;
 
+    [MethodImpl(MethodImplOptions.NoInlining)]
     public async Task<string> HeaderValueAsync(string name)
         => (await ActualHeadersAsync().ConfigureAwait(false)).Get(name);
 

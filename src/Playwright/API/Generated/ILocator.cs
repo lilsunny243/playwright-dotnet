@@ -48,10 +48,19 @@ public partial interface ILocator
     /// </para>
     /// <para>**Usage**</para>
     /// <code>
-    /// foreach (var li in await page.GetByRole('listitem').AllAsync())<br/>
+    /// foreach (var li in await page.GetByRole("listitem").AllAsync())<br/>
     ///   await li.ClickAsync();
     /// </code>
     /// </summary>
+    /// <remarks>
+    /// <para>
+    /// <see cref="ILocator.AllAsync"/> does not wait for elements to match the locator,
+    /// and instead immediately returns whatever is present in the page.  When the list
+    /// of elements changes dynamically, <see cref="ILocator.AllAsync"/> will produce unpredictable
+    /// and flaky results.  When the list of elements is stable, but loaded dynamically,
+    /// wait for the full list to finish loading before calling <see cref="ILocator.AllAsync"/>.
+    /// </para>
+    /// </remarks>
     Task<IReadOnlyList<ILocator>> AllAsync();
 
     /// <summary>
@@ -67,6 +76,15 @@ public partial interface ILocator
     /// <code>var texts = await page.GetByRole(AriaRole.Link).AllTextContentsAsync();</code>
     /// </summary>
     Task<IReadOnlyList<string>> AllTextContentsAsync();
+
+    /// <summary>
+    /// <para>Creates a locator that matches both this locator and the argument locator.</para>
+    /// <para>**Usage**</para>
+    /// <para>The following example finds a button with a specific title.</para>
+    /// <code>var button = page.GetByRole(AriaRole.Button).And(page.GetByTitle("Subscribe"));</code>
+    /// </summary>
+    /// <param name="locator">Additional locator to match.</param>
+    ILocator And(ILocator locator);
 
     /// <summary>
     /// <para>
@@ -463,8 +481,8 @@ public partial interface ILocator
     /// var rowLocator = page.Locator("tr");<br/>
     /// // ...<br/>
     /// await rowLocator<br/>
-    ///     .Filter(new LocatorFilterOptions { HasText = "text in column 1" })<br/>
-    ///     .Filter(new LocatorFilterOptions {<br/>
+    ///     .Filter(new() { HasText = "text in column 1" })<br/>
+    ///     .Filter(new() {<br/>
     ///         Has = page.GetByRole(AriaRole.Button, new() { Name = "column 2 button" } )<br/>
     ///     })<br/>
     ///     .ScreenshotAsync();
@@ -525,26 +543,38 @@ public partial interface ILocator
     ILocator GetByAltText(Regex text, LocatorGetByAltTextOptions? options = default);
 
     /// <summary>
-    /// <para>Allows locating input elements by the text of the associated label.</para>
+    /// <para>
+    /// Allows locating input elements by the text of the associated <c>&lt;label&gt;</c>
+    /// or <c>aria-labelledby</c> element, or by the <c>aria-label</c> attribute.
+    /// </para>
     /// <para>**Usage**</para>
     /// <para>
-    /// For example, this method will find the input by label text "Password" in the following
-    /// DOM:
+    /// For example, this method will find inputs by label "Username" and "Password" in
+    /// the following DOM:
     /// </para>
-    /// <code>await page.GetByLabel("Password").FillAsync("secret");</code>
+    /// <code>
+    /// await page.GetByLabel("Username").FillAsync("john");<br/>
+    /// await page.GetByLabel("Password").FillAsync("secret");
+    /// </code>
     /// </summary>
     /// <param name="text">Text to locate the element for.</param>
     /// <param name="options">Call options</param>
     ILocator GetByLabel(string text, LocatorGetByLabelOptions? options = default);
 
     /// <summary>
-    /// <para>Allows locating input elements by the text of the associated label.</para>
+    /// <para>
+    /// Allows locating input elements by the text of the associated <c>&lt;label&gt;</c>
+    /// or <c>aria-labelledby</c> element, or by the <c>aria-label</c> attribute.
+    /// </para>
     /// <para>**Usage**</para>
     /// <para>
-    /// For example, this method will find the input by label text "Password" in the following
-    /// DOM:
+    /// For example, this method will find inputs by label "Username" and "Password" in
+    /// the following DOM:
     /// </para>
-    /// <code>await page.GetByLabel("Password").FillAsync("secret");</code>
+    /// <code>
+    /// await page.GetByLabel("Username").FillAsync("john");<br/>
+    /// await page.GetByLabel("Password").FillAsync("secret");
+    /// </code>
     /// </summary>
     /// <param name="text">Text to locate the element for.</param>
     /// <param name="options">Call options</param>
@@ -662,19 +692,19 @@ public partial interface ILocator
     /// <para>You can locate by text substring, exact string, or a regular expression:</para>
     /// <code>
     /// // Matches &lt;span&gt;<br/>
-    /// page.GetByText("world")<br/>
+    /// page.GetByText("world");<br/>
     /// <br/>
     /// // Matches first &lt;div&gt;<br/>
-    /// page.GetByText("Hello world")<br/>
+    /// page.GetByText("Hello world");<br/>
     /// <br/>
     /// // Matches second &lt;div&gt;<br/>
-    /// page.GetByText("Hello", new() { Exact: true })<br/>
+    /// page.GetByText("Hello", new() { Exact = true });<br/>
     /// <br/>
     /// // Matches both &lt;div&gt;s<br/>
-    /// page.GetByText(new Regex("Hello"))<br/>
+    /// page.GetByText(new Regex("Hello"));<br/>
     /// <br/>
     /// // Matches second &lt;div&gt;<br/>
-    /// page.GetByText(new Regex("^hello$", RegexOptions.IgnoreCase))
+    /// page.GetByText(new Regex("^hello$", RegexOptions.IgnoreCase));
     /// </code>
     /// <para>**Details**</para>
     /// <para>
@@ -703,19 +733,19 @@ public partial interface ILocator
     /// <para>You can locate by text substring, exact string, or a regular expression:</para>
     /// <code>
     /// // Matches &lt;span&gt;<br/>
-    /// page.GetByText("world")<br/>
+    /// page.GetByText("world");<br/>
     /// <br/>
     /// // Matches first &lt;div&gt;<br/>
-    /// page.GetByText("Hello world")<br/>
+    /// page.GetByText("Hello world");<br/>
     /// <br/>
     /// // Matches second &lt;div&gt;<br/>
-    /// page.GetByText("Hello", new() { Exact: true })<br/>
+    /// page.GetByText("Hello", new() { Exact = true });<br/>
     /// <br/>
     /// // Matches both &lt;div&gt;s<br/>
-    /// page.GetByText(new Regex("Hello"))<br/>
+    /// page.GetByText(new Regex("Hello"));<br/>
     /// <br/>
     /// // Matches second &lt;div&gt;<br/>
-    /// page.GetByText(new Regex("^hello$", RegexOptions.IgnoreCase))
+    /// page.GetByText(new Regex("^hello$", RegexOptions.IgnoreCase));
     /// </code>
     /// <para>**Details**</para>
     /// <para>
@@ -828,7 +858,7 @@ public partial interface ILocator
     /// or radio input.
     /// </para>
     /// <para>**Usage**</para>
-    /// <code>Boolean checked = await page.GetByRole(AriaRole.Checkbox).IsCheckedAsync();</code>
+    /// <code>var isChecked = await page.GetByRole(AriaRole.Checkbox).IsCheckedAsync();</code>
     /// </summary>
     /// <param name="options">Call options</param>
     Task<bool> IsCheckedAsync(LocatorIsCheckedOptions? options = default);
@@ -887,9 +917,20 @@ public partial interface ILocator
     /// </para>
     /// <para><a href="https://playwright.dev/dotnet/docs/locators">Learn more about locators</a>.</para>
     /// </summary>
-    /// <param name="selector">A selector to use when resolving DOM element.</param>
+    /// <param name="selectorOrLocator">A selector or locator to use when resolving DOM element.</param>
     /// <param name="options">Call options</param>
-    ILocator Locator(string selector, LocatorLocatorOptions? options = default);
+    ILocator Locator(string selectorOrLocator, LocatorLocatorOptions? options = default);
+
+    /// <summary>
+    /// <para>
+    /// The method finds an element matching the specified selector in the locator's subtree.
+    /// It also accepts filter options, similar to <see cref="ILocator.Filter"/> method.
+    /// </para>
+    /// <para><a href="https://playwright.dev/dotnet/docs/locators">Learn more about locators</a>.</para>
+    /// </summary>
+    /// <param name="selectorOrLocator">A selector or locator to use when resolving DOM element.</param>
+    /// <param name="options">Call options</param>
+    ILocator Locator(ILocator selectorOrLocator, LocatorLocatorOptions? options = default);
 
     /// <summary>
     /// <para>
@@ -902,6 +943,26 @@ public partial interface ILocator
     /// <param name="index">
     /// </param>
     ILocator Nth(int index);
+
+    /// <summary>
+    /// <para>Creates a locator that matches either of the two locators.</para>
+    /// <para>**Usage**</para>
+    /// <para>
+    /// Consider a scenario where you'd like to click on a "New email" button, but sometimes
+    /// a security settings dialog shows up instead. In this case, you can wait for either
+    /// a "New email" button, or a dialog and act accordingly.
+    /// </para>
+    /// <code>
+    /// var newEmail = page.GetByRole(AriaRole.Button, new() { Name = "New" });<br/>
+    /// var dialog = page.GetByText("Confirm security settings");<br/>
+    /// await Expect(newEmail.Or(dialog)).ToBeVisibleAsync();<br/>
+    /// if (await dialog.IsVisibleAsync())<br/>
+    ///   await page.GetByRole(AriaRole.Button, new() { Name = "Dismiss" }).ClickAsync();<br/>
+    /// await newEmail.ClickAsync();
+    /// </code>
+    /// </summary>
+    /// <param name="locator">Alternative locator to match.</param>
+    ILocator Or(ILocator locator);
 
     /// <summary><para>A page this locator belongs to.</para></summary>
     IPage Page { get; }

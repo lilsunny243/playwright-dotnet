@@ -68,6 +68,17 @@ public partial interface ILocatorAssertions
     public ILocatorAssertions Not { get; }
 
     /// <summary>
+    /// <para>
+    /// Ensures that <see cref="ILocator"/> points to an <a href="https://playwright.dev/dotnet/docs/actionability#attached">attached</a>
+    /// DOM node.
+    /// </para>
+    /// <para>**Usage**</para>
+    /// <code>await Expect(Page.GetByText("Hidden text")).ToBeAttachedAsync();</code>
+    /// </summary>
+    /// <param name="options">Call options</param>
+    Task ToBeAttachedAsync(LocatorAssertionsToBeAttachedOptions? options = default);
+
+    /// <summary>
     /// <para>Ensures the <see cref="ILocator"/> points to a checked input.</para>
     /// <para>**Usage**</para>
     /// <code>
@@ -166,7 +177,7 @@ public partial interface ILocatorAssertions
     /// </para>
     /// <para>**Usage**</para>
     /// <code>
-    /// var locator = Page.Locator("button.submit");<br/>
+    /// var locator = Page.GetByRole(AriaRole.Button);<br/>
     /// // Make sure at least some part of element intersects viewport.<br/>
     /// await Expect(locator).ToBeInViewportAsync();<br/>
     /// // Make sure element is fully outside of viewport.<br/>
@@ -185,10 +196,7 @@ public partial interface ILocatorAssertions
     /// DOM node.
     /// </para>
     /// <para>**Usage**</para>
-    /// <code>
-    /// var locator = Page.Locator(".my-element");<br/>
-    /// await Expect(locator).ToBeVisibleAsync();
-    /// </code>
+    /// <code>await Expect(Page.GetByText("Welcome")).ToBeVisibleAsync();</code>
     /// </summary>
     /// <param name="options">Call options</param>
     Task ToBeVisibleAsync(LocatorAssertionsToBeVisibleOptions? options = default);
@@ -757,7 +765,7 @@ public partial interface ILocatorAssertions
     /// <para>For example, given the following element:</para>
     /// <code>
     /// var locator = Page.Locator("id=favorite-colors");<br/>
-    /// await locator.SelectOptionAsync(new string[] { "R", "G" })<br/>
+    /// await locator.SelectOptionAsync(new string[] { "R", "G" });<br/>
     /// await Expect(locator).ToHaveValuesAsync(new Regex[] { new Regex("R"), new Regex("G") });
     /// </code>
     /// </summary>
@@ -774,7 +782,7 @@ public partial interface ILocatorAssertions
     /// <para>For example, given the following element:</para>
     /// <code>
     /// var locator = Page.Locator("id=favorite-colors");<br/>
-    /// await locator.SelectOptionAsync(new string[] { "R", "G" })<br/>
+    /// await locator.SelectOptionAsync(new string[] { "R", "G" });<br/>
     /// await Expect(locator).ToHaveValuesAsync(new Regex[] { new Regex("R"), new Regex("G") });
     /// </code>
     /// </summary>

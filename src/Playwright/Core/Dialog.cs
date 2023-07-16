@@ -22,6 +22,7 @@
  * SOFTWARE.
  */
 
+using System.Runtime.CompilerServices;
 using System.Threading.Tasks;
 using Microsoft.Playwright.Transport;
 using Microsoft.Playwright.Transport.Channels;
@@ -46,11 +47,17 @@ internal class Dialog : ChannelOwnerBase, IChannelOwner<Dialog>, IDialog
 
     public string Message => _initializer.Message;
 
+    // Note: dialogs that open early during page initialization block it.
+    // Therefore, we must report the dialog without a page to be able to handle it.
+    public IPage Page => _initializer.Page;
+
     ChannelBase IChannelOwner.Channel => _channel;
 
     IChannel<Dialog> IChannelOwner<Dialog>.Channel => _channel;
 
+    [MethodImpl(MethodImplOptions.NoInlining)]
     public Task AcceptAsync(string promptText) => _channel.AcceptAsync(promptText ?? string.Empty);
 
+    [MethodImpl(MethodImplOptions.NoInlining)]
     public Task DismissAsync() => _channel.DismissAsync();
 }

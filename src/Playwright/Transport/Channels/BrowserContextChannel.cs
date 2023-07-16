@@ -42,6 +42,10 @@ internal class BrowserContextChannel : Channel<BrowserContext>
 
     internal event EventHandler Close;
 
+    internal event EventHandler<IConsoleMessage> Console;
+
+    internal event EventHandler<IDialog> Dialog;
+
     internal event EventHandler<BrowserContextPageEventArgs> Page;
 
     internal event EventHandler<BrowserContextPageEventArgs> BackgroundPage;
@@ -71,6 +75,12 @@ internal class BrowserContextChannel : Channel<BrowserContext>
                 BindingCall?.Invoke(
                     this,
                     serverParams?.GetProperty("binding").ToObject<BindingCallChannel>(Connection.DefaultJsonSerializerOptions).Object);
+                break;
+            case "dialog":
+                Dialog?.Invoke(this, serverParams?.GetProperty("dialog").ToObject<DialogChannel>(Connection.DefaultJsonSerializerOptions).Object);
+                break;
+            case "console":
+                Console?.Invoke(this, serverParams?.GetProperty("message").ToObject<ConsoleMessage>(Connection.DefaultJsonSerializerOptions));
                 break;
             case "route":
                 var route = serverParams?.GetProperty("route").ToObject<RouteChannel>(Connection.DefaultJsonSerializerOptions).Object;
@@ -135,7 +145,7 @@ internal class BrowserContextChannel : Channel<BrowserContext>
     internal Task PauseAsync()
         => Connection.SendMessageToServerAsync(Guid, "pause");
 
-    internal Task SetDefaultNavigationTimeoutNoReplyAsync(float timeout)
+    internal Task SetDefaultNavigationTimeoutNoReplyAsync(float? timeout)
         => Connection.SendMessageToServerAsync<PageChannel>(
             Guid,
             "setDefaultNavigationTimeoutNoReply",
@@ -144,7 +154,7 @@ internal class BrowserContextChannel : Channel<BrowserContext>
                 ["timeout"] = timeout,
             });
 
-    internal Task SetDefaultTimeoutNoReplyAsync(float timeout)
+    internal Task SetDefaultTimeoutNoReplyAsync(float? timeout)
         => Connection.SendMessageToServerAsync<PageChannel>(
             Guid,
             "setDefaultTimeoutNoReply",
@@ -259,12 +269,14 @@ internal class BrowserContextChannel : Channel<BrowserContext>
         string path,
         string recordHarUrlFilter,
         string recordHarUrlFilterString,
-        Regex recordHarUrlFilterRegex)
+        Regex recordHarUrlFilterRegex,
+        HarContentPolicy? harContentPolicy,
+        HarMode? harMode)
     {
         var args = new Dictionary<string, object>
             {
                 { "page", page?.Channel },
-                { "options", BrowserChannel.PrepareHarOptions(HarContentPolicy.Attach, HarMode.Minimal, path, null, recordHarUrlFilter, recordHarUrlFilterString, recordHarUrlFilterRegex) },
+                { "options", BrowserChannel.PrepareHarOptions(harContentPolicy ?? HarContentPolicy.Attach, harMode ?? HarMode.Minimal, path, null, recordHarUrlFilter, recordHarUrlFilterString, recordHarUrlFilterRegex) },
             };
         var result = await Connection.SendMessageToServerAsync(Guid, "harStart", args).ConfigureAwait(false);
         return result.GetString("harId", false);
