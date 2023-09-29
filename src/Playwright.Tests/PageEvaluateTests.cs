@@ -39,6 +39,7 @@ public class PageEvaluateTests : PageTestEx
         Assert.AreEqual(21, result);
     }
 
+    [PlaywrightTest()]
     public async Task ShouldSerializeArguments()
     {
         int result = await Page.EvaluateAsync<int>("a => a.m * a.n", new { m = 7, n = 3 });
@@ -146,11 +147,16 @@ public class PageEvaluateTests : PageTestEx
         Assert.True(result);
     }
 
-    [PlaywrightTest("page-evaluate.spec.ts", "should transfer maps as empty objects")]
-    public async Task ShouldTransferMapsAsEmptyObjects()
+    [PlaywrightTest("page-evaluate.spec.ts", "should transfer maps")]
+    public async Task ShouldTransferMaps()
     {
-        dynamic result = await Page.EvaluateAsync<ExpandoObject>("a => a.x.constructor.name + ' ' + JSON.stringify(a.x), {x: new Map([[1, 2]])}");
-        Assert.IsEmpty(TypeDescriptor.GetProperties(result));
+        Assert.AreEqual(await Page.EvaluateAsync<Dictionary<string, object>>("() => new Map([[1, { test: 42n }]])"), new Dictionary<string, object> { });
+    }
+
+    [PlaywrightTest("page-evaluate.spec.ts", "should transfer sets")]
+    public async Task ShouldTransferSets()
+    {
+        Assert.AreEqual(await Page.EvaluateAsync<HashSet<object>>("() => new Set([1, { test: 42n }])"), new HashSet<object> { });
     }
 
     [PlaywrightTest("page-evaluate.spec.ts", "should modify global environment")]
@@ -651,6 +657,7 @@ public class PageEvaluateTests : PageTestEx
         Assert.AreEqual(new DateTime(2020, 05, 27, 1, 31, 38, 506), result.date);
     }
 
+    [PlaywrightTest()]
     public async Task ShouldSerializeEnumProperty()
     {
         int result = await Page.EvaluateAsync<int>("a => a.TestEnum", new ClassWithEnumProperty());
@@ -698,6 +705,18 @@ public class PageEvaluateTests : PageTestEx
         Assert.AreEqual("kek", result.ToString());
         result = await Page.EvaluateAsync<JsonElement>("() => 'kek'");
         Assert.AreEqual("kek", result.ToString());
+
+        result = await Page.EvaluateAsync<JsonElement?>("() => null"); // null
+        Assert.Null(result);
+        result = await Page.EvaluateAsync<JsonElement>("() => null");
+        Assert.NotNull(result);
+        Assert.AreEqual(JsonValueKind.Null, result.Value.ValueKind);
+
+        result = await Page.EvaluateAsync<JsonElement?>("() => undefined"); // undefined
+        Assert.Null(result);
+        result = await Page.EvaluateAsync<JsonElement>("() => undefined");
+        Assert.NotNull(result);
+        Assert.AreEqual(JsonValueKind.Null, result.Value.ValueKind);
     }
 
     private class Shape
@@ -713,4 +732,15 @@ public class PageEvaluateTests : PageTestEx
         Assert.AreEqual(600, result.Width);
         Assert.AreEqual(400, result.Height);
     }
+
+#if NET6_0_OR_GREATER
+    private record ShapeRecord(int Width, int Height);
+
+    [PlaywrightTest()]
+    public async Task ShouldParseRecordProperties()
+    {
+        var exception = await PlaywrightAssert.ThrowsAsync<PlaywrightException>(() => Page.EvaluateAsync<ShapeRecord>("() => ({ width: 600, height: 400 })"));
+        Assert.IsInstanceOf<MissingMethodException>(exception.InnerException);
+    }
+#endif
 }

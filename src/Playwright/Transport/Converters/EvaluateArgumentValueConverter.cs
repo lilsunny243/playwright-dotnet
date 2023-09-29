@@ -41,6 +41,11 @@ namespace Microsoft.Playwright.Transport.Converters;
 
 internal static class EvaluateArgumentValueConverter
 {
+    private static readonly JsonSerializerOptions _evaluateArgumentValueConverterSerializerOptions = new()
+    {
+        ReferenceHandler = System.Text.Json.Serialization.ReferenceHandler.Preserve,
+    };
+
     internal static object Serialize(object value, List<EvaluateArgumentGuidElement> handles, VisitorInfo visitorInfo)
     {
         int id;
@@ -196,15 +201,14 @@ internal static class EvaluateArgumentValueConverter
             return parsed;
         }
 
-        // User wants Json, serialize/parse. On .NET 6 there is a method that does this w/o full serialization.
+        // User wants Json, serialize to JsonElement.
         if (t == typeof(JsonElement) || t == typeof(JsonElement?))
         {
-            var serializerOptions = new JsonSerializerOptions
+            if (t == typeof(JsonElement?) && parsed == null)
             {
-                ReferenceHandler = System.Text.Json.Serialization.ReferenceHandler.Preserve,
-            };
-            string serialized = JsonSerializer.Serialize(parsed, serializerOptions);
-            return JsonSerializer.Deserialize(serialized, t, serializerOptions);
+                return null;
+            }
+            return JsonSerializer.SerializeToElement(parsed, _evaluateArgumentValueConverterSerializerOptions);
         }
 
         // Convert recursively to a requested type.
@@ -241,9 +245,9 @@ internal static class EvaluateArgumentValueConverter
             {
                 objResult = Activator.CreateInstance(t);
             }
-            catch (Exception)
+            catch (Exception ex)
             {
-                throw new PlaywrightException("Return type mismatch. Expecting " + t.ToString() + ", got Object");
+                throw new PlaywrightException("Return type mismatch. Expecting " + t.ToString() + ", got Object", ex);
             }
             visited.Add(parsed, objResult);
 
@@ -335,6 +339,20 @@ internal static class EvaluateArgumentValueConverter
             return new Regex(regex.GetProperty("p").ToString(), RegexOptionsExtensions.FromInlineFlags(regex.GetProperty("f").ToString()));
         }
 
+        if (result.TryGetProperty("m", out var map))
+        {
+            var expando = new ExpandoObject();
+            refs.Add(map.GetProperty("id").GetInt32(), expando);
+            return expando;
+        }
+
+        if (result.TryGetProperty("se", out var set))
+        {
+            var expando = new ExpandoObject();
+            refs.Add(set.GetProperty("id").GetInt32(), expando);
+            return expando;
+        }
+
         if (result.TryGetProperty("b", out var boolean))
         {
             return boolean.ToObject<bool>();
@@ -355,9 +373,7 @@ internal static class EvaluateArgumentValueConverter
             var expando = new ExpandoObject();
             refs.Add(result.GetProperty("id").GetInt32(), expando);
             IDictionary<string, object> dict = expando;
-            var keyValues = obj.ToObject<KeyJsonElementValueObject[]>();
-
-            foreach (var kv in keyValues)
+            foreach (var kv in obj.ToObject<KeyJsonElementValueObject[]>())
             {
                 dict[kv.K] = ParseEvaluateResultToExpando(kv.V, refs);
             }

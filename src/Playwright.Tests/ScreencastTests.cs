@@ -171,4 +171,70 @@ public class ScreencastTests : BrowserTestEx
 
         Assert.IsNotEmpty(new DirectoryInfo(tempDirectory.Path).GetFiles("*.webm"));
     }
+
+
+    [PlaywrightTest("screencast.spec.ts", "video.path()/saveAs() does not hang immediately after launchPersistentContext and context.close()")]
+    [Timeout(30_000)]
+    public async Task VideoPathSaveAsDoesNotHangImmediatelyAfterLaunchPersistentContextAndContextClose()
+    {
+        using var userDirectory = new TempDirectory();
+        using var tempDirectory = new TempDirectory();
+
+        var context = await BrowserType.LaunchPersistentContextAsync(userDirectory.Path, new()
+        {
+            RecordVideoDir = tempDirectory.Path
+        });
+        var page = context.Pages[0];
+        await context.CloseAsync();
+        try
+        {
+            await page.Video.PathAsync();
+        }
+        catch (Exception)
+        {
+        }
+        try
+        {
+            await page.Video.SaveAsAsync("video.mp4");
+        }
+        catch (Exception)
+        {
+        }
+        await page.Video.DeleteAsync();
+    }
+
+    [PlaywrightTest("screencast.spec.ts", "saveAs should throw when no video frames")]
+    public async Task SaveAsShouldThrowWhenNoVideoFrames()
+    {
+        using var tempDirectory = new TempDirectory();
+        var context = await Browser.NewContextAsync(new()
+        {
+            RecordVideoDir = tempDirectory.Path,
+            RecordVideoSize = new() { Width = 320, Height = 240 },
+            ViewportSize = new() { Width = 320, Height = 240 }
+        });
+
+        var page = await context.NewPageAsync();
+        var (popup, _) = await TaskUtils.WhenAll(
+            page.Context.WaitForPageAsync(),
+            page.EvaluateAsync("() => window.open('about:blank').close()")
+        );
+        await page.CloseAsync();
+
+        var saveAsPath = Path.Combine(tempDirectory.Path, "my-video.webm");
+        Exception exception = null;
+        try
+        {
+            await popup.Video.SaveAsAsync(saveAsPath);
+        }
+        catch (Exception e)
+        {
+            exception = e;
+        }
+        // WebKit pauses renderer before win.close() and actually writes something,
+        // and other browsers are sometimes fast as well.
+        if (!File.Exists(saveAsPath))
+            StringAssert.Contains("Page did not produce any video frames", exception.Message);
+        await context.CloseAsync();
+    }
 }

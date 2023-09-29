@@ -177,7 +177,7 @@ internal class Locator : ILocator
         {
             throw new ArgumentException("Locators must belong to the same frame.");
         }
-        return new Locator(_frame, $"{_selector} >> {locatorImpl._selector}", options);
+        return new Locator(_frame, $"{_selector} >> internal:chain={JsonSerializer.Serialize(locatorImpl._selector, _locatorSerializerOptions)}", options);
     }
 
     IFrameLocator ILocator.FrameLocator(string selector) =>
@@ -322,6 +322,9 @@ internal class Locator : ILocator
     public Task TypeAsync(string text, LocatorTypeOptions options = null)
         => _frame.TypeAsync(_selector, text, ConvertOptions<FrameTypeOptions>(options));
 
+    public Task PressSequentiallyAsync(string text, LocatorPressSequentiallyOptions options = null)
+        => TypeAsync(text, ConvertOptions<LocatorTypeOptions>(options));
+
     public Task UncheckAsync(LocatorUncheckOptions options = null)
         => _frame.UncheckAsync(_selector, ConvertOptions<FrameUncheckOptions>(options));
 
@@ -456,13 +459,13 @@ internal class Locator : ILocator
         => $"internal:testid=[{testIdAttributeName}={EscapeForAttributeSelector(testId, true)}]";
 
     internal static string GetByTestIdSelector(string testIdAttributeName, Regex testId)
-        => $"internal:testid=[{testIdAttributeName}={EscapeForTextSelector(testId, true)}]";
+        => $"internal:testid=[{testIdAttributeName}={EscapeForAttributeSelector(testId, true)}]";
 
     internal static string GetByAttributeTextSelector(string attrName, string text, bool? exact)
         => $"internal:attr=[{attrName}={EscapeForAttributeSelector(text, exact ?? false)}]";
 
     internal static string GetByAttributeTextSelector(string attrName, Regex text, bool? exact)
-        => $"internal:attr=[{attrName}={EscapeForTextSelector(text, exact)}]";
+        => $"internal:attr=[{attrName}={EscapeForAttributeSelector(text, exact ?? false)}]";
 
     internal static string GetByLabelSelector(string text, bool? exact)
         => "internal:label=" + EscapeForTextSelector(text, exact);
@@ -531,7 +534,7 @@ internal class Locator : ILocator
         }
         else if (options.NameRegex != null)
         {
-            props.Add(new List<string> { "name", $"/{options.NameRegex}/{options.NameRegex.Options.GetInlineFlags()}" });
+            props.Add(new List<string> { "name", EscapeForAttributeSelector(options.NameRegex, options?.Exact ?? false) });
         }
         if (options.Pressed != null)
         {
@@ -550,28 +553,25 @@ internal class Locator : ILocator
         return $"\"{value.Replace("\\", "\\\\").Replace("\"", "\\\"")}\"{exactFlag}";
     }
 
+    private static string EscapeForAttributeSelector(Regex value, bool exact)
+    {
+        return EscapeRegexForSelector(value);
+    }
+
+    private static string EscapeRegexForSelector(Regex text)
+    {
+        // Even number of backslashes followed by the quote -> insert a backslash.
+        return Regex.Replace($"/{text}/{text.Options.GetInlineFlags()}", @"(^|[^\\])(\\\\)*([\""'`])", "$1$2\\$3").Replace(">>", "\\>\\>");
+    }
+
     private static string EscapeForTextSelector(Regex text, bool? exact)
     {
-        return $"/{text}/{text.Options.GetInlineFlags()}";
+        return EscapeRegexForSelector(text);
     }
 
     private static string EscapeForTextSelector(string text, bool? exact)
     {
-        if (exact == true)
-        {
-            return $"\"{text.Replace("\"", "\\\"")}\"";
-        }
-        if (text.Contains("\"") || text.Contains(">>") || text[0] == '/')
-        {
-            return $"/{new Regex(@"\s+").Replace(EscapeForRegex(text), "\\s+")}/i";
-        }
-        return text;
-    }
-
-    private static string EscapeForRegex(string text)
-    {
-        var patern = new Regex(@"[.*+?^>${}()|[\]\\]");
-        return patern.Replace(text, "\\$&");
+        return JsonSerializer.Serialize(text, _locatorSerializerOptions) + (exact == true ? "s" : "i");
     }
 
     async Task<IReadOnlyList<ILocator>> ILocator.AllAsync()

@@ -66,7 +66,7 @@ public class BrowserContextFetchTests : PageTestEx
             return Task.CompletedTask;
         });
         var error = await PlaywrightAssert.ThrowsAsync<PlaywrightException>(async () => await Context.APIRequest.GetAsync(Server.Prefix + "/test"));
-        StringAssert.Contains("socket hang up", error.Message);
+        Assert.True(error.Message.Contains("read ECONNRESET") || error.Message.Contains("socket hang up"));
     }
 
     [PlaywrightTest("browsercontext-fetch.spec.ts", "should throw on network error after redirect")]
@@ -79,7 +79,7 @@ public class BrowserContextFetchTests : PageTestEx
             return Task.CompletedTask;
         });
         var error = await PlaywrightAssert.ThrowsAsync<PlaywrightException>(async () => await Context.APIRequest.GetAsync(Server.Prefix + "/redirect"));
-        StringAssert.Contains("socket hang up", error.Message);
+        Assert.True(error.Message.Contains("read ECONNRESET") || error.Message.Contains("socket hang up"));
     }
 
     [PlaywrightTest("browsercontext-fetch.spec.ts", "should add session cookies to request")]
@@ -701,6 +701,21 @@ public class BrowserContextFetchTests : PageTestEx
         Assert.AreEqual("text/javascript", responseFormFiles["file"].contentType);
         Assert.AreEqual("var x = 10;\r\n;console.log(x);", responseFormFiles["file"].content);
         Assert.AreEqual(200, response.Status);
+    }
+
+    [PlaywrightTest("browsercontext-fetch.spec.ts", "should not allow file payloads in Form parameter")]
+    public async Task ShouldNotAllowFilePayloadsInFormParameter()
+    {
+        var file = new FilePayload()
+        {
+            Name = "f.js",
+            MimeType = "text/javascript",
+            Buffer = Array.Empty<byte>()
+        };
+        var formData = Context.APIRequest.CreateFormData();
+        formData.Set("file", file);
+        var exception = await PlaywrightAssert.ThrowsAsync<PlaywrightException>(() => Context.APIRequest.PostAsync(Server.EmptyPage, new() { Form = formData }));
+        StringAssert.Contains("Form requests don't support file payloads, use Multipart=formData instead.", exception.Message);
     }
 
     [PlaywrightTest("browsercontext-fetch.spec.ts", "should serialize data to json regardless of content-type")]

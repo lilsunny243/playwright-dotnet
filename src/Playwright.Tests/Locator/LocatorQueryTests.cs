@@ -116,6 +116,40 @@ public class LocatorQueryTests : PageTestEx
         StringAssert.Contains(await Page.Locator("div", new() { HasTextRegex = new Regex("Hello \"world\"") }).InnerTextAsync(), "Hello \"world\"");
     }
 
+    [PlaywrightTest("locator-query.spec.ts", "should filter by regex with a single quote")]
+    public async Task ShouldFilterByRegexWithASingleQuote()
+    {
+        await Page.SetContentAsync("<button>let's let's<span>hello</span></button>");
+        await Expect(Page.Locator("button", new() { HasTextRegex = new Regex(@"let's", RegexOptions.IgnoreCase) }).Locator("span")).ToHaveTextAsync("hello");
+        await Expect(Page.GetByRole(AriaRole.Button, new() { NameRegex = new Regex(@"let's", RegexOptions.IgnoreCase) }).Locator("span")).ToHaveTextAsync("hello");
+        await Expect(Page.Locator("button", new() { HasTextRegex = new Regex(@"let\'s", RegexOptions.IgnoreCase) }).Locator("span")).ToHaveTextAsync("hello");
+        await Expect(Page.GetByRole(AriaRole.Button, new() { NameRegex = new Regex(@"let\'s", RegexOptions.IgnoreCase) }).Locator("span")).ToHaveTextAsync("hello");
+        await Expect(Page.Locator("button", new() { HasTextRegex = new Regex(@"'s", RegexOptions.IgnoreCase) }).Locator("span")).ToHaveTextAsync("hello");
+        await Expect(Page.GetByRole(AriaRole.Button, new() { NameRegex = new Regex(@"'s", RegexOptions.IgnoreCase) }).Locator("span")).ToHaveTextAsync("hello");
+        await Expect(Page.Locator("button", new() { HasTextRegex = new Regex(@"\'s", RegexOptions.IgnoreCase) }).Locator("span")).ToHaveTextAsync("hello");
+        await Expect(Page.GetByRole(AriaRole.Button, new() { NameRegex = new Regex(@"\'s", RegexOptions.IgnoreCase) }).Locator("span")).ToHaveTextAsync("hello");
+        await Expect(Page.Locator("button", new() { HasTextRegex = new Regex(@"let['abc]s", RegexOptions.IgnoreCase) }).Locator("span")).ToHaveTextAsync("hello");
+        await Expect(Page.GetByRole(AriaRole.Button, new() { NameRegex = new Regex(@"let['abc]s", RegexOptions.IgnoreCase) }).Locator("span")).ToHaveTextAsync("hello");
+        await Expect(Page.Locator("button", new() { HasTextRegex = new Regex(@"let\\'s", RegexOptions.IgnoreCase) })).Not.ToBeVisibleAsync();
+        await Expect(Page.GetByRole(AriaRole.Button, new() { NameRegex = new Regex(@"let\\'s", RegexOptions.IgnoreCase) })).Not.ToBeVisibleAsync();
+        await Expect(Page.Locator("button", new() { HasTextRegex = new Regex(@"let's let\'s", RegexOptions.IgnoreCase) }).Locator("span")).ToHaveTextAsync("hello");
+        await Expect(Page.GetByRole(AriaRole.Button, new() { NameRegex = new Regex(@"let's let\'s", RegexOptions.IgnoreCase) }).Locator("span")).ToHaveTextAsync("hello");
+        await Expect(Page.Locator("button", new() { HasTextRegex = new Regex(@"let\'s let's", RegexOptions.IgnoreCase) }).Locator("span")).ToHaveTextAsync("hello");
+        await Expect(Page.GetByRole(AriaRole.Button, new() { NameRegex = new Regex(@"let\'s let's", RegexOptions.IgnoreCase) }).Locator("span")).ToHaveTextAsync("hello");
+
+        await Page.SetContentAsync("<button>let\\'s let\\'s<span>hello</span></button>");
+        await Expect(Page.Locator("button", new() { HasTextRegex = new Regex(@"let\'s", RegexOptions.IgnoreCase) })).Not.ToBeVisibleAsync();
+        await Expect(Page.GetByRole(AriaRole.Button, new() { NameRegex = new Regex(@"let\'s", RegexOptions.IgnoreCase) })).Not.ToBeVisibleAsync();
+        await Expect(Page.Locator("button", new() { HasTextRegex = new Regex(@"let\\'s", RegexOptions.IgnoreCase) }).Locator("span")).ToHaveTextAsync("hello");
+        await Expect(Page.GetByRole(AriaRole.Button, new() { NameRegex = new Regex(@"let\\'s", RegexOptions.IgnoreCase) }).Locator("span")).ToHaveTextAsync("hello");
+        await Expect(Page.Locator("button", new() { HasTextRegex = new Regex(@"let\\\'s", RegexOptions.IgnoreCase) }).Locator("span")).ToHaveTextAsync("hello");
+        await Expect(Page.GetByRole(AriaRole.Button, new() { NameRegex = new Regex(@"let\\\'s", RegexOptions.IgnoreCase) }).Locator("span")).ToHaveTextAsync("hello");
+        await Expect(Page.Locator("button", new() { HasTextRegex = new Regex(@"let\\'s let\\\'s", RegexOptions.IgnoreCase) }).Locator("span")).ToHaveTextAsync("hello");
+        await Expect(Page.GetByRole(AriaRole.Button, new() { NameRegex = new Regex(@"let\\'s let\\\'s", RegexOptions.IgnoreCase) }).Locator("span")).ToHaveTextAsync("hello");
+        await Expect(Page.Locator("button", new() { HasTextRegex = new Regex(@"let\\\'s let\\'s", RegexOptions.IgnoreCase) }).Locator("span")).ToHaveTextAsync("hello");
+        await Expect(Page.GetByRole(AriaRole.Button, new() { NameRegex = new Regex(@"let\\\'s let\\'s", RegexOptions.IgnoreCase) }).Locator("span")).ToHaveTextAsync("hello");
+    }
+
     [PlaywrightTest("locator-query.spec.ts", "should filter by regex and regexp flags")]
     public async Task ShouldFilterByRegexandRegexpFlags()
     {
@@ -232,6 +266,23 @@ public class LocatorQueryTests : PageTestEx
         await Expect(Page.Locator("article").Or(Page.Locator("span"))).ToHaveTextAsync("world");
         await Expect(Page.Locator("div").Or(Page.Locator("article"))).ToHaveTextAsync("hello");
         await Expect(Page.Locator("span").Or(Page.Locator("article"))).ToHaveTextAsync("world");
+    }
+
+    [PlaywrightTest("locator-query.spec.ts", "should support locator.locator with and/or")]
+    public async Task ShouldSupportLocatorLocatorWithAndOr()
+    {
+        await Page.SetContentAsync(@"
+            <div>one <span>two</span> <button>three</button> </div>
+            <span>four</span>
+            <button>five</button>
+        ");
+
+        await Expect(Page.Locator("div").Locator(Page.Locator("button"))).ToHaveTextAsync(new[] { "three" });
+        await Expect(Page.Locator("div").Locator(Page.Locator("button").Or(Page.Locator("span")))).ToHaveTextAsync(new[] { "two", "three" });
+        await Expect(Page.Locator("button").Or(Page.Locator("span"))).ToHaveTextAsync(new[] { "two", "three", "four", "five" });
+
+        await Expect(Page.Locator("div").Locator(Page.Locator("button").And(Page.GetByRole(AriaRole.Button)))).ToHaveTextAsync(new[] { "three" });
+        await Expect(Page.Locator("button").And(Page.GetByRole(AriaRole.Button))).ToHaveTextAsync(new[] { "three", "five" });
     }
 
     [PlaywrightTest("locator-query.spec.ts", "should enforce same frame for has:locator'")]

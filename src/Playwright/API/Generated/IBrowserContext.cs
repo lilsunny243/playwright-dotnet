@@ -138,6 +138,14 @@ public partial interface IBrowserContext
 
     /// <summary>
     /// <para>
+    /// Emitted when exception is unhandled in any of the pages in this context. To listen
+    /// for errors from a particular page, use <see cref="IPage.PageError"/> instead.
+    /// </para>
+    /// </summary>
+    event EventHandler<IWebError> WebError;
+
+    /// <summary>
+    /// <para>
     /// Emitted when a request is issued from any pages created through this context. The
     /// <see cref="request"/> object is read-only. To only listen for requests from a particular
     /// page, use <see cref="IPage.Request"/>.
@@ -625,7 +633,7 @@ public partial interface IBrowserContext
     /// <summary>
     /// <para>
     /// If specified the network requests that are made in the context will be served from
-    /// the HAR file. Read more about <a href="https://playwright.dev/dotnet/docs/network#replaying-from-har">Replaying
+    /// the HAR file. Read more about <a href="https://playwright.dev/dotnet/docs/mock#replaying-from-har">Replaying
     /// from HAR</a>.
     /// </para>
     /// <para>

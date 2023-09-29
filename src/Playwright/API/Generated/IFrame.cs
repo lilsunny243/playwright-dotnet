@@ -447,7 +447,7 @@ public partial interface IFrame
     /// is inside the <c>&lt;label&gt;</c> element that has an associated <a href="https://developer.mozilla.org/en-US/docs/Web/API/HTMLLabelElement/control">control</a>,
     /// the control will be filled instead.
     /// </para>
-    /// <para>To send fine-grained keyboard events, use <see cref="IFrame.TypeAsync"/>.</para>
+    /// <para>To send fine-grained keyboard events, use <see cref="ILocator.PressSequentiallyAsync"/>.</para>
     /// </summary>
     /// <param name="selector">
     /// A selector to search for an element. If there are multiple elements satisfying the
@@ -1424,6 +1424,12 @@ public partial interface IFrame
     /// <param name="options">Call options</param>
     Task SetCheckedAsync(string selector, bool checkedState, FrameSetCheckedOptions? options = default);
 
+    /// <summary>
+    /// <para>
+    /// This method internally calls <a href="https://developer.mozilla.org/en-US/docs/Web/API/Document/write">document.write()</a>,
+    /// inheriting all its specific characteristics and behaviors.
+    /// </para>
+    /// </summary>
     /// <param name="html">HTML markup to assign to the page.</param>
     /// <param name="options">Call options</param>
     Task SetContentAsync(string html, FrameSetContentOptions? options = default);
@@ -1595,7 +1601,11 @@ public partial interface IFrame
     Task<string> TitleAsync();
 
     /// <summary>
-    /// <para>Use locator-based <see cref="ILocator.TypeAsync"/> instead. Read more about <a href="https://playwright.dev/dotnet/docs/locators">locators</a>.</para>
+    /// <para>
+    /// **DEPRECATED** In most cases, you should use <see cref="ILocator.FillAsync"/> instead.
+    /// You only need to press keys one by one if there is special keyboard handling on
+    /// the page - in this case use <see cref="ILocator.PressSequentiallyAsync"/>.
+    /// </para>
     /// <para>
     /// Sends a <c>keydown</c>, <c>keypress</c>/<c>input</c>, and <c>keyup</c> event for
     /// each character in the text. <c>frame.type</c> can be used to send fine-grained keyboard
@@ -1603,10 +1613,6 @@ public partial interface IFrame
     /// </para>
     /// <para>To press a special key, like <c>Control</c> or <c>ArrowDown</c>, use <see cref="IKeyboard.PressAsync"/>.</para>
     /// <para>**Usage**</para>
-    /// <code>
-    /// await frame.TypeAsync("#mytextarea", "hello"); // types instantly<br/>
-    /// await frame.TypeAsync("#mytextarea", "world", new() { Delay = 100 }); // types slower, like a user
-    /// </code>
     /// </summary>
     /// <param name="selector">
     /// A selector to search for an element. If there are multiple elements satisfying the
@@ -1614,6 +1620,7 @@ public partial interface IFrame
     /// </param>
     /// <param name="text">A text to type into a focused element.</param>
     /// <param name="options">Call options</param>
+    [System.Obsolete]
     Task TypeAsync(string selector, string text, FrameTypeOptions? options = default);
 
     /// <summary>
